@@ -3,7 +3,7 @@
 # 1) 설치
 npm install
 
-# 2) 개발 서버 실행
+# 2) 개발 서버 실행 (frontend 폴더에서 실행)
 npm run dev
 # http://localhost:5173 (Vite 기본 포트)
 
