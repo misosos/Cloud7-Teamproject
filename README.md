@@ -25,13 +25,6 @@ npm install
 npm run dev
 # 서버가 뜨면: http://localhost:3000/health
 ```
-
-### 헬스체크 (npm ren dev 실행상태에서 다른 터미널 창 켜서 아래 명령어 실행)
-```bash
-curl -i http://localhost:3000/health
-# 200 OK 와 함께 { "ok": true } 응답
-```
-
 ### 자주 나는 이슈 & 해결
 - **포트 점유**: `PORT` 변경하거나 기존 프로세스 종료 후 재시작.
 - **CORS 타입 에러**: `npm i -D @types/cors`

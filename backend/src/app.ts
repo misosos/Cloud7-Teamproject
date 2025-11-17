@@ -100,6 +100,20 @@ app.use(session({
  * - `/auth`   : 로그인/로그아웃, /auth/me 등 인증 관련
  * - 추후 라우트가 늘어나도 `src/routes`에서만 추가하면 이곳은 그대로 사용 가능
  */
+
+/**
+ * 루트 경로 핸들러: 환영 메시지(JSON)로 200 응답
+ * - 브라우저로 바로 접근했을 때도 유용한 안내 제공
+ * - 운영/모니터링용 헬스체크는 /health 유지
+ */
+app.get('/', (_req, res) => {
+  res.status(200).json({
+    message: 'Cloud7 Backend is running.',
+    docs: '/docs (추후 Swagger 연결 시)',
+    health: '/health',
+  });
+});
+
 app.use(routes);
 
 export default app;
