@@ -1,4 +1,4 @@
-## 초기 설정
+## Frontend 초기 설정
 ```bash
 # 1) 설치
 npm install
@@ -16,4 +16,27 @@ npm run dev
 > npm run dev
 > ```
 
+## Backend 초기 설정
+
 ---
+
+### 빠른 시작 (Backend)
+```bash
+cd backend
+npm install
+# .env 파일 만들기 (아래 예시 참고)
+npm run dev
+# 서버가 뜨면: http://localhost:3000/health
+```
+
+### 헬스체크
+```bash
+curl -i http://localhost:3000/health
+# 200 OK 와 함께 { "ok": true } 응답
+```
+
+### 자주 나는 이슈 & 해결
+- **포트 점유**: `PORT` 변경하거나 기존 프로세스 종료 후 재시작.
+- **CORS 타입 에러**: `npm i -D @types/cors`
+- **ES 모듈 import 오류**: `tsconfig.json`에 `"esModuleInterop": true` 설정.
+- **서버 접속 불가**: `npm run dev`가 실행 중인지 확인 → `curl /health`로 점검.
