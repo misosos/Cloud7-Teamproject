@@ -29,6 +29,7 @@
  */
 
 import express from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import morgan from 'morgan';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -39,11 +40,17 @@ import { env } from './utils/env';
 
 const app = express();
 
+/** 보안: X-Powered-By 헤더 제거 (스택 노출 방지) */
+app.disable('x-powered-by');
+
 /** 요청/응답 로그: 개발 편의를 위해 간단한 'dev' 포맷 사용 */
 app.use(morgan('dev'));
 
 /** JSON 본문 파싱: 클라이언트가 보낸 JSON 바디(req.body)를 읽을 수 있게 함 */
 app.use(express.json());
+
+/** URL-encoded 본문 파싱: 일반 HTML form 전송 지원 */
+app.use(express.urlencoded({ extended: true }));
 
 /** 쿠키 파싱: 서명되지 않은 일반 쿠키를 req.cookies에 파싱 */
 app.use(cookieParser());
@@ -57,7 +64,11 @@ app.use(cookieParser());
 app.use(cors({
   origin: env.CORS_ORIGIN,
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 204,
 }));
+
 
 /**
  * 프록시 신뢰 설정
@@ -115,5 +126,26 @@ app.get('/', (_req, res) => {
 });
 
 app.use(routes);
+
+/** 404 핸들러: 정의되지 않은 라우트 */
+app.use((req: Request, res: Response) => {
+  res.status(404).json({
+    ok: false,
+    error: 'Not Found',
+    path: req.path,
+    method: req.method,
+  });
+});
+
+/** 전역 오류 핸들러: 예기치 못한 서버 오류 */
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  // 개발 중엔 콘솔에 전체 에러 출력
+  console.error(err);
+  // 민감 정보 노출 방지: 클라이언트에는 일반화된 메시지 전달
+  res.status(500).json({
+    ok: false,
+    error: 'Internal Server Error',
+  });
+});
 
 export default app;

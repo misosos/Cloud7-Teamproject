@@ -1,120 +1,152 @@
+// frontend/src/store/auth.ts
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import apiClient from "@/services/apiClient";
 
 /**
- * 🔐 전역 인증 상태 Store (useAuth)
- * ─────────────────────────────────────────────────────────
- * 백엔드 연동 시에도 그대로 재사용 가능한 형태로 정리했습니다.
- * - 로컬스토리지에는 **user / token 만 부분 저장**(isLoggedIn은 매번 파생)
- * - 앱 시작 시 persist 복원 후, **user && token** 존재 시 isLoggedIn=true 로 재계산
- * - 과거 잔여값 이슈 방지 위해 저장 키를 `auth-v2` 로 변경
- * - 로그아웃 시 구 키(`auth-storage`)까지 함께 제거(안전)
- *
- * ※ 실서비스에선 토큰을 httpOnly 쿠키(서버 세션)로 관리하는 걸 권장합니다.
- *   이 경우 token 필드는 빈 문자열/ null 이어도 되고,
- *   로그인 성공 시 서버에서 세션만 세팅하고, 프론트는 /auth/me 응답의 user 로 상태를 갱신하세요.
+ * 🔐 전역 인증 Store (useAuth)
+ * ─────────────────────────────────────────────────────────────────────
+ * - 서버 세션/쿠키 인증을 기본으로 가정 (프론트는 user만 저장)
+ * - isLoggedIn은 user 파생(!!user)
+ * - 앱 부팅 시 /auth/me로 세션 존재 확인 → ready로 초기 깜빡임 제어
+ * - 로컬스토리지에는 user/token만 저장(partialize)
+ * - bootstrap 재호출/루프 방지용 bootstrapping 플래그 추가
+ * - persist onRehydrateStorage로 복원 완료 시 파생값 재계산 + ready=true
  */
 
-// ▸ 사용자 정보 형태(아이디/이름/이메일)
 export type User = {
   id: string;
   name: string;
   email: string;
 };
 
-// ▸ 전역 인증 상태와 메서드 정의
-export type AuthState = {
-  /** 현재 로그인 여부 (파생 값: user && token 존재 여부) */
+type AuthState = {
+  /** 하이드레이션/부팅 체크 완료 플래그 */
+  ready: boolean;
+  /** 파생 로그인 상태: !!user */
   isLoggedIn: boolean;
-  /** 로그인한 사용자 정보 (없으면 null) */
+  /** 로그인 사용자 (없으면 null) */
   user: User | null;
-  /** 액세스 토큰(JWT 등). 세션 방식이면 null/빈 값 유지 가능 */
+  /** 액세스 토큰(옵션, 세션쿠키면 null 유지 가능) */
   token: string | null;
+  /** 부팅 중 중복 호출 방지 */
+  bootstrapping: boolean;
 
-  /**
-   * 로그인 처리 함수
-   * - 서버 로그인 성공 후 받은 값을 넣습니다.
-   * - 세션/쿠키 방식이면 token 없이 user 만 전달해도 됩니다.
-   */
+  /** 앱 부팅 시 세션 확인 → user 세팅 → ready=true */
+  bootstrap: () => Promise<void>;
+  /** 로그인 후 상태 반영 (세션이면 token 없이 user만 넣어도 됨) */
   login: (payload: { user: User; token?: string | null }) => void;
-
-  /** 로그아웃 처리: 상태 초기화 + (옵션) 로컬 스토리지 키 정리 */
+  /** 로그아웃: 상태 초기화 + 로컬 키 정리 (서버 /auth/logout은 화면/서비스에서 호출) */
   logout: () => void;
+  /** /auth/me 응답으로 user만 갱신할 때 유용 */
+  setUser: (user: User | null) => void;
 };
 
-const initialAuth: Pick<AuthState, "isLoggedIn" | "user" | "token"> = {
+const initialAuth: Pick<
+  AuthState,
+  "ready" | "isLoggedIn" | "user" | "token" | "bootstrapping"
+> = {
+  ready: false,
   isLoggedIn: false,
   user: null,
   token: null,
+  bootstrapping: false,
 };
 
 export const useAuth = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...initialAuth,
 
-      // ▸ 로그인: 전달받은 사용자/토큰을 저장하고 isLoggedIn=true로 전환
+      /**
+       * 앱 첫 진입 시 세션 존재 여부 확인
+       * - 성공: { user } 수신 → 로그인 상태로 전환
+       * - 실패/401: 비로그인 상태 + ready=true
+       * - 재호출/루프 방지: ready/bootstrapping 가드
+       */
+      bootstrap: async () => {
+        const { ready, bootstrapping } = get();
+        if (ready || bootstrapping) return;
+        set({ bootstrapping: true });
+        try {
+          // apiClient.get는 AxiosResponse가 아니라 "data 본문"을 직접 반환하는 어댑터라고 가정
+          type MeResponse = { user: User | null };
+          const me = (await apiClient.get("/auth/me", {
+            withCredentials: true,
+          })) as MeResponse;
+          const user: User | null = me?.user ?? null;
+          set({ user, isLoggedIn: !!user, ready: true, bootstrapping: false });
+        } catch {
+          set({
+            user: null,
+            isLoggedIn: false,
+            ready: true,
+            bootstrapping: false,
+          });
+        }
+      },
+
+      /**
+       * 로그인 직후 화면에서 호출(선호하는 방식으로 사용)
+       * - (세션쿠키 방식) 서버가 세션만 세팅 → 응답 user가 있으면 그걸 저장, 없으면 /auth/me로 확인
+       * - (JWT 방식) token도 함께 저장 가능
+       */
       login: ({ user, token = null }) =>
         set({
-          isLoggedIn: true,
           user,
           token,
+          isLoggedIn: !!user, // user 파생
+          ready: true,
         }),
 
-      // ▸ 로그아웃: 인증 상태 초기화 + 구 키까지 정리(안전)
+      /**
+       * 로컬 상태 정리(서버 세션 종료는 서비스/화면 단에서 /auth/logout 호출)
+       * - ready는 true로 유지해 부팅 루프 방지
+       */
       logout: () => {
-        set({ ...initialAuth });
+        set({ ...initialAuth, ready: true });
         try {
           localStorage.removeItem("auth-v2");
-          localStorage.removeItem("auth-storage"); // 과거 버전 잔여값 정리
+          localStorage.removeItem("auth-storage"); // 구버전 잔여값 정리
         } catch {}
       },
+
+      setUser: (user) =>
+        set({
+          user,
+          isLoggedIn: !!user, // 파생 갱신
+        }),
     }),
     {
-      // ▸ 새 브라우저 저장 키 (구버전과 분리)
       name: "auth-v2",
       storage: createJSONStorage(() => localStorage),
-      // ▸ 저장 범위를 user/token만으로 제한 (isLoggedIn은 저장하지 않음)
+      // 저장은 user/token만 (isLoggedIn/ready/bootstrapping은 파생/런타임)
       partialize: (s) => ({ user: s.user, token: s.token }),
+      /**
+       * persist 복원 완료 시: 파생값 재계산 + ready=true
+       * - 하이드레이션 타이밍에 한 번만 실행되므로 안전
+       */
+      onRehydrateStorage: () => (state) => {
+        const user = state?.user ?? null;
+        useAuth.setState({
+          isLoggedIn: !!user,
+          ready: true,
+        });
+      },
     }
   )
 );
 
-/**
- * ✅ persist 복원 완료 시점에 isLoggedIn 파생 값 재계산
- *  - user && token 이 모두 있을 때만 true (세션 방식이면 token 없이 user만으로도 OK하도록 바꾸려면 여기 로직 조절)
- */
-(useAuth as any).persist?.onFinishHydration?.(() => {
-  const { user, token } = useAuth.getState();
-  const authed = !!user && (token === null ? true : !!token);
-  useAuth.setState({ isLoggedIn: authed });
-});
+/** ✅ 안전한 primitive selector들을 외부에서 사용하세요(객체 selector 금지 권장) */
+export const selectReady = (s: AuthState) => s.ready;
+export const selectIsLoggedIn = (s: AuthState) => s.isLoggedIn;
+export const selectUser = (s: AuthState) => s.user;
+export const selectBootstrap = (s: AuthState) => s.bootstrap;
+export const selectLogout = (s: AuthState) => s.logout;
+export const selectLogin = (s: AuthState) => s.login;
 
-// 모듈 최초 로드 시 한 번 보정(SSR/초기 깜빡임 최소화)
+/** 모듈 최초 로드시 1차 보정(SSR/초기 깜빡임 완화) */
 try {
-  const { user, token } = useAuth.getState();
-  const authed = !!user && (token === null ? true : !!token);
-  if (authed) useAuth.setState({ isLoggedIn: true });
+  const { user } = useAuth.getState();
+  if (user) useAuth.setState({ isLoggedIn: true });
 } catch {}
-
-/*
- * ─────────────────────────────────────────────────────────
- * 사용 예시(개발자 참고)
- *
- * // (세션 쿠키 방식) 로그인 성공 후:
- * // 1) 서버가 쿠키로 세션을 세팅
- * // 2) 프론트는 /auth/me 로 user를 받아서 저장
- * useAuth.getState().login({ user: { id: "u1", name: "김미소", email: "miso@example.com" }, token: null });
- *
- * // (JWT 응답 방식) 로그인 성공 후:
- * useAuth.getState().login({ user: { id: "u1", name: "김미소", email: "miso@example.com" }, token: "ACCESS_TOKEN" });
- *
- * // 로그아웃 버튼 클릭 시:
- * useAuth.getState().logout();
- *
- * // 헤더에서 로그인 상태/이메일 표시:
- * const { isLoggedIn, user } = useAuth();
- *
- * // 보호 라우트에서의 사용:
- * const authed = useAuth.getState().isLoggedIn;
- */

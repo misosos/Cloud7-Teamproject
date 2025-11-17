@@ -21,7 +21,7 @@
  *  - Routes/Route : 각 주소(path)와 그 주소에서 보여줄 컴포넌트(element)를 연결하는 설정
  *  - ProtectedRoute: 로그인이 필요할 때만 자식 라우트를 통과시키는 보호막(컴포넌트)
  */
-
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Dashboard from "@/pages/AfterLogin/Dashboard"; // 로그인 후 메인 화면
 import TasteList from "@/pages/TasteRecord/TasteList"; // 기록 목록(보호 라우트 내부)
@@ -35,16 +35,31 @@ import { useAuth } from "@/store/auth"; // 전역 인증 상태(Zustand)
  * - "/"(홈)에서 로그인 상태를 확인해 적절한 첫 화면을 결정합니다.
  *   · 전역 상태 isLoggedIn이 true면 → <Dashboard />
  *   · false면 → <BeforeLogin /> (여기서 로그인/회원가입 모달을 띄울 수 있음)
+ * - 최초 진입 시 /auth/me(세션 확인)를 한 번 호출해 스토어를 부팅(hydration)합니다.
  */
 function HomeGate() {
-  // 오직 전역 상태(Zustand)의 isLoggedIn만 신뢰합니다.
-  // 로컬스토리지 잔여 키로 인한 오판(비로그인인데 대시보드 노출)을 방지하기 위함입니다.
-  const isLoggedIn = useAuth((s) => s.isLoggedIn);
+  // ✅ Zustand는 "원시값(selector) 구독"이 안전합니다. 객체 리턴은 리렌더 루프를 유발할 수 있어요.
+  const ready = useAuth((s) => s.ready);            // 부팅(/auth/me) 완료 플래그
+  const isLoggedIn = useAuth((s) => s.isLoggedIn);  // 로그인 여부
+  const bootstrap = useAuth((s) => s.bootstrap);    // 스토어 초기화 함수
+
+  // 앱 첫 진입 시 세션 확인(한 번만). ready가 false일 때만 호출
+  useEffect(() => {
+    if (!ready) {
+      bootstrap();
+    }
+  }, [ready, bootstrap]);
+
+  // 아직 부팅 하이드레이션(/auth/me) 중이면 간단한 로딩 표시
+  if (!ready) return <div style={{ padding: 24 }}>앱을 준비 중입니다…</div>;
+
+  // 준비 완료 후, 로그인 여부에 따라 첫 화면 결정
   return isLoggedIn ? <Dashboard /> : <BeforeLogin />;
 }
 
 function HomeGateKeyed() {
   // 로그인/로그아웃 전환 시 홈 루트 컴포넌트를 완전히 재마운트시켜 잔상/상태 누수를 방지
+  // key는 로그인 상태만 의존(ready는 일시적 상태이므로 key로 사용하지 않음)
   const isLoggedIn = useAuth((s) => s.isLoggedIn);
   return <HomeGate key={isLoggedIn ? "in" : "out"} />;
 }

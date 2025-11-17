@@ -14,12 +14,33 @@
  *  3) 모달에서 로그인/회원가입이 성공하면 next(또는 홈)로 이동합니다.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Hero from "@/sections/Hero";                    // 상단 대표 배너(풀-블리드로 보이는 시각 요소)
 import HeaderNav from "@/components/HeaderNav";        // 상단 네비게이션 (여기서는 잠금 모드로 사용)
 import SignupModal from "@/components/SignupModal";    // 로그인/회원가입 통합 모달
 import { useLocation, useNavigate } from "react-router-dom"; // URL 쿼리와 페이지 이동을 위한 라우터 훅
 import { useAuth } from "@/store/auth";
+import apiClient from "@/services/apiClient";
+
+/**
+ * 안전한 next 경로 계산
+ * - 외부 URL(open redirect) 방지: 반드시 "/"로 시작하고 "//"나 "http"로 시작하지 않도록 제한
+ * - 디코딩 오류 등 예외 발생 시 "/"로 대체
+ */
+function resolveNext(search: string): string {
+  const params = new URLSearchParams(search);
+  const raw = params.get("next") || "/";
+  try {
+    const decoded = decodeURIComponent(raw);
+    // 내부 경로만 허용 (예: "/dashboard", "/settings")
+    if (decoded.startsWith("/") && !decoded.startsWith("//")) {
+      return decoded;
+    }
+  } catch {
+    // ignore
+  }
+  return "/";
+}
 
 /**
  * 로그인 전 메인 화면 컴포넌트
@@ -38,6 +59,8 @@ export default function BeforeLogin() {
   // 모달 최초 모드: "login" 또는 "signup" (버튼으로 무엇을 눌렀는지 반영)
   const [initialMode, setInitialMode] = useState<"login" | "signup">("login");
 
+  const handledAuthSuccess = useRef(false); // React 18/StrictMode 중복 호출 방지 (idempotent 가드)
+
   // 로그인/회원가입 버튼 클릭 시 모달 열기
   const openAuth = (mode: "login" | "signup") => {
     setInitialMode(mode);
@@ -50,23 +73,15 @@ export default function BeforeLogin() {
    * - 이미 로그인 상태라면 즉시 이동, 아니라면 로그인 성공 이벤트를 기다렸다가 이동합니다.
    */
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const next = params.get("next");
+    const dest = resolveNext(location.search);
 
-    const go = () => {
-      // next가 있으면 그곳으로, 없으면 홈("/")으로 이동
-      const dest = next ? decodeURIComponent(next) : "/";
-      navigate(dest, { replace: true });
-    };
-
-    // 로그인 상태가 되면 즉시 이동
     if (isLoggedIn) {
-      go();
+      navigate(dest, { replace: true });
       return;
     }
 
-    // (보조) 커스텀 이벤트를 듣고 이동 — 모달/헤더에서 수동 브로드캐스트할 때 사용
-    const onLogin = () => go();
+    // (보조) 커스텀 로그인 이벤트를 듣고 이동 — 모달/헤더에서 브로드캐스트할 때 사용
+    const onLogin = () => navigate(dest, { replace: true });
     window.addEventListener("auth:login", onLogin);
     return () => window.removeEventListener("auth:login", onLogin);
   }, [isLoggedIn, location.search, navigate]);
@@ -124,21 +139,68 @@ export default function BeforeLogin() {
         initialMode={initialMode}
         onClose={() => setOpen(false)}
         onSwitchMode={(m: "login" | "signup") => setInitialMode(m)}
-        onSuccess={(user) => {
-          // 1) 전역 인증 상태(Zustand)에 로그인 사실을 반영해 즉시 리렌더 유도
-          //    - 새로고침 없이 대시보드/헤더가 로그인 상태로 전환되도록 함
-          try {
-            const email = user?.email ?? "user@example.com";
-            const name = (user as any)?.name ?? email.split("@")[0];
-            const id = (user as any)?.id ?? email; // 없으면 이메일을 임시 id로 사용
-            const token = (user as any)?.token ?? "LOCAL_FAKE_TOKEN"; // 데모용 토큰
-            useAuth.getState().login({ user: { id, name, email }, token });
-          } catch {}
+        onSuccess={async (user) => {
+          // React 18 StrictMode나 중복 트리거에 대비: 성공 처리 한 번만 수행
+          if (handledAuthSuccess.current) return;
+          handledAuthSuccess.current = true;
+          /**
+           * 1) 서버 세션 쿠키 기반으로 /auth/me를 호출해 사용자 정보를 동기화
+           *    - apiClient가 AxiosResponse<T> 또는 T 자체를 반환하는 두 케이스를 모두 지원
+           * 2) 스토어의 User 타입(name/email: string 필수)에 맞춰 안전하게 기본값 채움
+           * 3) 실패 시 모달이 넘긴 user로 폴백
+           */
+          type MeUser = { id?: string; email?: string; name?: string };
+          type MeResponse = { user: MeUser } | MeUser;
 
-          // 2) 원래 가려던 경로(next)가 있으면 복귀, 없으면 홈("/")로 이동
-          const params = new URLSearchParams(location.search);
-          const next = params.get("next");
-          navigate(next ? decodeURIComponent(next) : "/", { replace: true });
+          try {
+            const res = await apiClient.get<MeResponse>("/auth/me");
+            // AxiosResponse 또는 data 직접 반환 케이스 모두 처리
+            const payload: any = (res as any)?.data ?? res;
+            const rawMe: any = payload?.user ?? payload;
+
+            // 스토어 User 타입에 맞게 안전 사용자 구성 (name/email은 string 보장)
+            const safeUser = rawMe
+              ? {
+                  id: typeof rawMe.id === "string"
+                    ? rawMe.id
+                    : (typeof rawMe.email === "string" ? rawMe.email : "unknown"),
+                  email: typeof rawMe.email === "string" ? rawMe.email : "",
+                  name:
+                    typeof rawMe.name === "string"
+                      ? rawMe.name
+                      : (typeof rawMe.email === "string" ? rawMe.email.split("@")[0] : "User"),
+                }
+              : null;
+
+            if (safeUser) {
+              // 세션 쿠키 기반이라 토큰은 보통 사용하지 않음
+              useAuth.getState().login?.({ user: safeUser, token: undefined });
+            } else {
+              // 폴백: 모달에서 전달된 user 사용 (string 보장)
+              const rawEmail = (user as any)?.email;
+              const email = typeof rawEmail === "string" ? rawEmail : "user@example.com";
+              const name = (user as any)?.name ?? email.split("@")[0];
+              const id = (user as any)?.id ?? email;
+              useAuth.getState().login?.({
+                user: { id: String(id), name: String(name), email: String(email) },
+                token: "LOCAL_FAKE_TOKEN",
+              });
+            }
+          } catch {
+            // 네트워크/서버 오류 시에도 폴백 적용 (string 보장)
+            const rawEmail = (user as any)?.email;
+            const email = typeof rawEmail === "string" ? rawEmail : "user@example.com";
+            const name = (user as any)?.name ?? email.split("@")[0];
+            const id = (user as any)?.id ?? email;
+            useAuth.getState().login?.({
+              user: { id: String(id), name: String(name), email: String(email) },
+              token: "LOCAL_FAKE_TOKEN",
+            });
+          }
+
+          // 3) 이동: 안전하게 산출한 next로 이동
+          const dest = resolveNext(location.search);
+          navigate(dest, { replace: true });
         }}
       />
     </div>

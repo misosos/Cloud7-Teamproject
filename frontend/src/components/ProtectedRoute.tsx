@@ -1,81 +1,47 @@
 /**
  * 🔒 ProtectedRoute (보호된 페이지 가드)
  * ─────────────────────────────────────────────────────────
- * 목적: "로그인이 필요한 페이지"에 로그인하지 않은 사용자가 들어오면
- *       로그인 전 랜딩(/before-login)으로 보내고, 로그인 후 원래 오려던 곳으로 돌려보냅니다.
+ * Zustand 구독 최적화 버전:
+ *  - 전역 스토어에서 필요한 값만 **원시값 selector**로 구독하여
+ *    `getSnapshot should be cached` 경고와 리렌더 루프를 방지합니다.
+ *  - 부팅(세션 확인) 완료 전에는 렌더를 보류하고, 이후 로그인 여부로 접근 제어합니다.
  *
- * 이 파일을 보면 좋은 사람
- *  - 기획/디자인: 로그인 흐름이 페이지에서 어떻게 막히고/열리는지 이해할 때
- *  - QA: 비로그인 접근 → 리다이렉트 → 로그인 후 복귀(next) 시나리오를 점검할 때
+ * 사용 방법
+ *  - 로그인 필요 페이지 라우트의 element로 감싸서 사용합니다.
+ *    예) <Route element={<ProtectedRoute/>}> ... </Route>
  *
- * 동작 개요
- *  1) 사용자가 보호된 경로(예: "/취향기록")에 접근하면,
- *  2) 현재 로그인 상태를 확인합니다.
- *     - Zustand 전역 상태(isLoggedIn)
- *     - 브라우저 저장소(localStorage/sessionStorage)의 세션(auth_user)
- *  3) 로그인되어 있지 않다면 "/before-login?next=원래경로"로 보냅니다.
- *  4) 로그인/회원가입이 성공하면, `next` 값이 있으면 거기로, 없으면 홈("/")로 이동합니다.
- *
- * 용어 정리
- *  - next: 로그인 후 "돌아갈 주소"를 뜻합니다. 주소창의 쿼리스트링으로 전달합니다.
- *          예) /before-login?next=/취향기록/123
- *
- * 구현 포인트
- *  - children이 있을 땐 그대로 렌더, 없을 땐 <Outlet/>으로 중첩 라우트를 지원합니다.
- *  - try/catch: 브라우저 환경이 아닌 경우(극히 드묾)에 대비해 안전하게 처리합니다.
+ * 동작
+ *  1) `ready`가 false면 아직 세션 확인 전 → null(또는 로딩 UI) 반환
+ *  2) `ready`가 true면 로그인 여부 확인
+ *     - 미로그인: "/before-login?next=원래경로"로 이동
+ *     - 로그인: children 또는 <Outlet/> 렌더
  */
 
-import { useAuth } from "@/store/auth"; // 전역 로그인 상태(Zustand)에서 isLoggedIn 값을 읽습니다.
-import { Navigate, useLocation, Outlet } from "react-router-dom"; // 라우터 도구들
+import { useAuth } from "@/store/auth"; // 전역 인증 스토어
+import { Navigate, useLocation, Outlet } from "react-router-dom";
 import type { ReactNode } from "react";
 
-/**
- * hasStoredUser()
- * - 브라우저 저장소에 로그인 정보가 남아 있는지 확인합니다.
- *   • localStorage: "로그인 유지"(remember ON)일 때 탭/새창에서도 유지
- *   • sessionStorage: 현재 탭에서만 유지
- */
-function hasStoredUser(): boolean {
-  try {
-    const key = "auth_user";
-    // local 또는 session 어느 한쪽에만 있어도 "로그인 상태로 인정"
-    return !!(localStorage.getItem(key) ?? sessionStorage.getItem(key));
-  } catch {
-    // (안전장치) SSR 등 특수 환경에서 storage 접근 실패 시 비로그인으로 판단
-    return false;
-  }
-}
-
-/**
- * ProtectedRoute 컴포넌트
- * - 보호가 필요한 경로를 이 컴포넌트로 감싸면, 비로그인 접근 시 차단하고 리다이렉트합니다.
- * - 사용법 (두 가지 모두 지원)
- *   1) 래퍼 방식
- *      <ProtectedRoute>
- *        <PrivatePage />
- *      </ProtectedRoute>
- *   2) 중첩 라우트 방식
- *      <Route element={<ProtectedRoute />}>
- *        <Route path="/취향기록" element={<TasteList />} />
- *      </Route>
- */
 export default function ProtectedRoute({ children }: { children?: ReactNode }) {
-  // 1) 전역 상태의 로그인 여부
-  const isLoggedIn = useAuth((s) => s.isLoggedIn);
-  // 2) 현재 주소 정보(원래 가려던 경로를 next로 담기 위해 필요)
+  // ✅ 중요: 객체가 아닌 "원시값" 단위 selector로 구독 → 스냅샷 안정화
+  const ready = useAuth((s) => s.ready);
+  const isLoggedIn = useAuth((s) => !!s.user);
+
+  // 사용자가 접근하려던 원래 주소(쿼리/해시 포함)를 next로 보관
   const location = useLocation();
 
-  // 최종 로그인 판단: 전역 상태 or 저장소 중 하나라도 true면 로그인
-  const authed = isLoggedIn || hasStoredUser();
+  // 1) 아직 인증 상태 결론이 나지 않았으면 판단 보류 (필요 시 로딩 UI로 교체)
+  if (!ready) {
+    return null; // e.g. return <FullScreenSpinner/>;
+  }
 
-  // 비로그인인 경우 → 로그인 전 랜딩으로 이동시키되, 돌아올 주소(next)를 같이 전달
-  if (!authed) {
-    const next = encodeURIComponent(location.pathname + location.search);
+  // 2) 미로그인 → 로그인 전 페이지로 이동, 로그인 성공 시 next로 복귀
+  if (!isLoggedIn) {
+    const next = encodeURIComponent(
+      location.pathname + location.search + location.hash
+    );
     return <Navigate to={`/before-login?next=${next}`} replace />;
   }
 
-  // 로그인 상태라면:
-  // - children이 있으면 그대로 렌더
-  // - 없으면 <Outlet/>을 렌더해서 중첩 라우트 내부의 실제 페이지를 보여줍니다.
+  // 3) 로그인 상태 → 보호된 자식 렌더 (children 우선, 없으면 <Outlet/>)
   return <>{children ?? <Outlet />}</>;
 }

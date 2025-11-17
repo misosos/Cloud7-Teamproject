@@ -2,14 +2,14 @@
  * API 클라이언트 (fetch 기반, 세션 쿠키/타임아웃/에러 파싱 지원)
  * ------------------------------------------------------------------
  * ▸ 실서버 연동 전/후 모두 재사용 가능한 초경량 래퍼입니다.
- * ▸ 기본값: VITE_API_URL → VITE_API_BASE → http://localhost:4000 순으로 사용.
+ * ▸ 기본값: VITE_API_URL → VITE_API_BASE → http://localhost:3000 순으로 사용.
  * ▸ 서버 세션(httpOnly 쿠키) 기반 인증을 고려해 credentials: 'include' 적용.
  * ▸ 공통 httpGet/httpPost/httpPut/httpDelete 제공 + 쿼리스트링/타임아웃/에러 파싱.
  */
 export const API_BASE =
   (import.meta as any).env?.VITE_API_URL ||
   (import.meta as any).env?.VITE_API_BASE ||
-  "http://localhost:4000";
+  "http://localhost:3000";
 
 // HTTP 메서드 타입
 type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
@@ -139,3 +139,19 @@ export const httpDelete = <T>(
  * const u  = await httpPost<User>("/auth/login", { email, password });
  * await httpPost<void>("/auth/logout");
  */
+
+// --------------------------------------------------------------
+// 기본(default) export: axios처럼 사용하는 얇은 어댑터
+//  - apiClient.get('/auth/me')
+//  - apiClient.post('/auth/login', { email, password })
+// --------------------------------------------------------------
+const apiClient = {
+  get: httpGet,
+  post: httpPost,
+  put: httpPut,
+  delete: httpDelete,
+  base: API_BASE,
+};
+
+export default apiClient;
+export { apiClient };
