@@ -1,9 +1,10 @@
 ## Frontend 초기 설정
 ```bash
 # 1) 설치
+cd frontend
 npm install
 
-# 2) 개발 서버 실행 (frontend 폴더에서 실행)
+# 2) 개발 서버 실행 
 npm run dev
 # http://localhost:5173 (Vite 기본 포트)
 
@@ -17,19 +18,15 @@ npm run dev
 > ```
 
 ## Backend 초기 설정
-
----
-
-### 빠른 시작 (Backend)
 ```bash
 cd backend
 npm install
-# .env 파일 만들기 (아래 예시 참고)
+# .env 파일 만들기 (.env.example 파일 내용 복붙)
 npm run dev
 # 서버가 뜨면: http://localhost:3000/health
 ```
 
-### 헬스체크
+### 헬스체크 (npm ren dev 실행상태에서 다른 터미널 창 켜서 아래 명령어 실행)
 ```bash
 curl -i http://localhost:3000/health
 # 200 OK 와 함께 { "ok": true } 응답
