@@ -29,6 +29,8 @@ import TasteDetail from "@/pages/TasteRecord/TasteDetail"; // 기록 상세(보�
 import BeforeLogin from "@/pages/BeforeLogin/BeforeLogin"; // 로그인 전 랜딩 페이지
 import ProtectedRoute from "@/components/ProtectedRoute"; // 로그인 필요 가드
 import { useAuth } from "@/store/auth"; // 전역 인증 상태(Zustand)
+import MapPage from "@/pages/Map/MapPage";
+
 
 /**
  * HomeGate
@@ -74,6 +76,8 @@ export default function App() {
          *  - 비로그인 접근 시 ProtectedRoute가 /before-login?next=... 로 보내고,
          *    로그인 성공 후 원래 가려던 경로(next)로 복귀합니다.
          */}
+         <Route path="/map" element={<MapPage />} />
+         {}
         <Route element={<ProtectedRoute />}>
           <Route path="/취향기록" element={<TasteList />} />
           <Route path="/취향기록/:id" element={<TasteDetail />} />
