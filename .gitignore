@@ -9,8 +9,11 @@
 !**/.env.example
 
 # Prisma (SQLite 파일 및 저널)
-prisma/dev.db
-prisma/dev.db-journal
+# ⚠️ prisma/migrations는 커밋(스키마 동기화용)
+prisma/*.db
+prisma/*.db-*
+# Prisma engines & client cache
+**/.prisma/
 
 # Prisma 생성물(경로별로 발생 가능)
 **/prisma/generated/
@@ -29,7 +32,25 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+.idea/
+*~
+*.swp
 
 # Next.js / Vite 등 프론트 빌드 산출물(혹시 쓸 경우)
 **/.next/
 **/.svelte-kit/
+
+# Frontend build/tool caches
+**/.vite/
+**/.cache/
+**/.turbo/
+**/.parcel-cache/
+
+# Hosting platform outputs
+.vercel/
+.netlify/
+
+# 테스트/커버리지 산출물
+coverage/
+.nyc_output/
+*.lcov
