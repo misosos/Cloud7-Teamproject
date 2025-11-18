@@ -1,36 +1,14 @@
-// ==============================================
-// 📁 라우트 집결지 — src/routes/index.ts
-// ==============================================
-// 이 파일은 "하위 라우터들을 한 곳에 모아서" 앱에 연결해 주는 허브입니다.
-//  - 예) /auth/* 요청은 auth 라우터가, /health/* 요청은 health 라우터가 처리
-//  - app.ts에서 이 파일을 `/api` 같은 접두사로 한 번만 연결하면
-//    실제 경로는 `/api/auth/*`, `/api/health/*` 형태가 됩니다.
+// src/routes/index.ts
+import { Router } from "express";
 
-import { Router } from 'express';
+import auth from "./auth.routes";
+import health from "./health.routes";
+import directions from "./directions.routes"; // ✅ 새로 만든 라우터
 
-// 각 도메인(기능)별 라우터를 가져옵니다.
-//  - auth: 로그인/회원가입/로그아웃 등 인증 관련 엔드포인트
-//  - health: 서버 살아있음(Health Check) 확인용 엔드포인트
-import auth from './auth.routes';
-import health from './health.routes';
-
-// 1) 비어 있는 라우터(미니 앱)를 하나 생성합니다.
-//    여기에 하위 라우터들을 "장착(mount)"해 하나의 큰 라우터로 합칩니다.
 const router = Router();
 
-// 2) 하위 라우터 장착
-//    '/auth/*' 로 들어오는 모든 요청을 auth 라우터가 처리하도록 연결
-router.use('/auth', auth);
+router.use("/auth", auth);
+router.use("/health", health);
+router.use("/directions", directions); // ✅ /api/directions/* 로 연결
 
-//    '/health/*' 로 들어오는 모든 요청을 health 라우터가 처리하도록 연결
-router.use('/health', health);
-
-// 3) 완성된 라우터를 외부로 내보냅니다.
-//    app.ts에서 `app.use('/api', routes)`처럼 한 번만 연결해 주면,
-//    최종 경로는 '/api/auth/*', '/api/health/*' 형태로 사용됩니다.
-//
-//    👉 새 라우터를 추가하고 싶다면?
-//       - 새 파일 추가: src/routes/posts.routes.ts
-//       - 여기에서 import posts from './posts.routes';
-//       - 아래처럼 장착: router.use('/posts', posts);
 export default router;
