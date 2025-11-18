@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import SignupModal from "@/components/SignupModal";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "@/store/auth";
 
 /**
  * 헤더 내비게이션 컴포넌트
  * - 중앙에 메인 메뉴가 위치함
  * - 우측에는 로그인/회원가입 또는 로그아웃 표시
- * - SignupModal과 상태를 연동하여 로그인 상태를 표기
+ * - 전역 auth 스토어(useAuth)와 연동 (로컬스토리지 직접관리 제거)
  */
 
 type HeaderNavProps = {
@@ -17,64 +18,43 @@ type HeaderNavProps = {
   authButtons?: "full" | "loginOnly" | "none"; // 기본값은 full
 };
 
-export default function HeaderNav({ lockNav = false, lockLogo = false, onOpenAuth, authButtons = "full" }: HeaderNavProps) {
-  const STORAGE_KEY = "auth_user";
+export default function HeaderNav({
+  lockNav = false,
+  lockLogo = false,
+  onOpenAuth,
+  authButtons = "full",
+}: HeaderNavProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // 모달 열림/모드 상태
+  // 인증 모달
   const [open, setOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
 
-  // 로그인 사용자 상태
-  const [user, setUser] = useState<{ email: string; [k: string]: any } | null>(null);
+  // ----- 전역 Auth 스토어 연동 -----
+  // 세션 사용자 (session?.user | user 어느 쪽이든 대응)
+  const user = useAuth((s: any) => s.session?.user ?? s.user ?? null);
+  const bootstrap = useAuth((s: any) => s.bootstrap);
+  const logout = useAuth((s: any) => s.logout);
+  // 서버 세션까지 정리하는 액션이 있으면 우선 사용
+  const logoutServer = useAuth((s: any) => s.logoutServer) as undefined | (() => Promise<void>);
 
-  // remember(ON) → localStorage, OFF → sessionStorage
-  useEffect(() => {
+  const handleLogout = async () => {
     try {
-      const rawLocal = localStorage.getItem(STORAGE_KEY);
-      const rawSession = sessionStorage.getItem(STORAGE_KEY);
-      const raw = rawLocal ?? rawSession;
-      if (raw) setUser(JSON.parse(raw));
-    } catch {}
-  }, []);
-
-  // 전역 이벤트 수신 (모달/다른 컴포넌트에서 브로드캐스트)
-  useEffect(() => {
-    const handleLogin = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { email: string; [k: string]: any };
-      if (detail && typeof detail.email === "string") setUser(detail);
-    };
-    const handleLogout = () => setUser(null);
-
-    window.addEventListener("auth:login", handleLogin);
-    window.addEventListener("auth:logout", handleLogout);
-    return () => {
-      window.removeEventListener("auth:login", handleLogin);
-      window.removeEventListener("auth:logout", handleLogout);
-    };
-  }, []);
-
-  // 탭 간 동기화 (다른 탭에서 로그인/로그아웃 시 반영)
-  useEffect(() => {
-    const onStorage = (ev: StorageEvent) => {
-      if (ev.key !== STORAGE_KEY) return;
-      try {
-        if (ev.newValue) setUser(JSON.parse(ev.newValue));
-        else setUser(null);
-      } catch {}
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, []);
-
-  const handleLogout = () => {
-    setUser(null);
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-      sessionStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
-    } catch {}
-    window.dispatchEvent(new CustomEvent("auth:logout"));
+      if (typeof logoutServer === "function") {
+        await logoutServer();
+      } else {
+        // fallback
+        await Promise.resolve(logout());
+      }
+      // 서버/스토어 상태를 반드시 최신화해서 user=null 보장
+      await bootstrap().catch(() => {});
+    } catch (e) {
+      console.warn("logout error:", e);
+    } finally {
+      // 보호 라우터가 세션을 감지해 리다이렉트하도록 보조적으로 이동
+      navigate("/before-login", { replace: true });
+    }
   };
 
   const openLogin = () => {
@@ -104,7 +84,7 @@ export default function HeaderNav({ lockNav = false, lockLogo = false, onOpenAut
         <button
           type="button"
           onClick={() => onOpenAuth?.("login")}
-          aria-disabled
+          aria-disabled={true}
           title="로그인 후 이용 가능합니다"
           className={`relative px-2 py-0.5 text-[13px] md:text-sm text-stone-400 cursor-not-allowed ${className}`}
         >
@@ -123,21 +103,41 @@ export default function HeaderNav({ lockNav = false, lockLogo = false, onOpenAut
     );
   };
 
+  // 로그인 성공 시, 로그인 전 화면에 머물러 있으면 대시보드로 자동 이동
+  // (헤더가 로그인 전 레이아웃에서도 렌더링될 때 대비)
+  useEffect(() => {
+    if (!user) return;
+    if (location.pathname === "/" || location.pathname.startsWith("/before-login")) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user, location.pathname, navigate]);
+
+  // 로그아웃(세션 만료 포함) 후 보호 페이지에 남아있는 케이스 방지
+  useEffect(() => {
+    if (user) return;
+    // 프로젝트 보호 경로들 필요 시 추가
+    const needAuth = ["/dashboard", "/취향기록"];
+    if (needAuth.some((p) => location.pathname.startsWith(p))) {
+      navigate("/before-login", { replace: true });
+    }
+  }, [user, location.pathname, navigate]);
+
   return (
     <>
       {/* 헤더 바 */}
       <header className="sticky top-0 z-30 mb-6 md:mb-8">
-        <nav
-          className="bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b border-stone-200/70 shadow-[0_2px_8px_rgba(0,0,0,0.04)]"
-        >
+        <nav className="bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b border-stone-200/70 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
           <div className="mx-auto max-w-6xl px-5 h-14 md:h-16 flex items-center gap-4">
             {/* 좌측 로고 */}
             {lockLogo ? (
-              <span className="flex items-center gap-2 min-w-0 select-none cursor-not-allowed" title="로그인 후 이용 가능합니다">
+              <span
+                className="flex items-center gap-2 min-w-0 select-none cursor-not-allowed"
+                title="로그인 후 이용 가능합니다"
+              >
                 <span className="text-[15px] md:text-[16px] font-semibold tracking-tight text-stone-900">취향도감</span>
               </span>
             ) : (
-              <Link to="/" className="flex items-center gap-2 min-w-0">
+              <Link to={user ? "/dashboard" : "/"} className="flex items-center gap-2 min-w-0">
                 <span className="text-[15px] md:text-[16px] font-semibold tracking-tight text-stone-900">취향도감</span>
               </Link>
             )}
@@ -145,10 +145,18 @@ export default function HeaderNav({ lockNav = false, lockLogo = false, onOpenAut
             {/* 중앙 네비 */}
             <div className={`hidden md:flex flex-1 justify-center ${lockNav ? "opacity-60" : ""}`}>
               <div className="flex items-center gap-8">
-                <div className="group"><NavItem to="/취향기록">취향기록</NavItem></div>
-                <div className="group"><NavItem to="#">탐험가연맹</NavItem></div>
-                <div className="group"><NavItem to="#">취향합치기</NavItem></div>
-                <div className="group"><NavItem to="#">랜덤탐험미션</NavItem></div>
+                <div className="group">
+                  <NavItem to="/취향기록">취향기록</NavItem>
+                </div>
+                <div className="group">
+                  <NavItem to="#">탐험가연맹</NavItem>
+                </div>
+                <div className="group">
+                  <NavItem to="#">취향합치기</NavItem>
+                </div>
+                <div className="group">
+                  <NavItem to="#">랜덤탐험미션</NavItem>
+                </div>
               </div>
             </div>
 
@@ -156,8 +164,11 @@ export default function HeaderNav({ lockNav = false, lockLogo = false, onOpenAut
             <div className="ml-auto flex items-center gap-3">
               {user ? (
                 <>
-                  <span className="hidden md:inline text-sm text-stone-600 truncate max-w-[160px]" title={user.email}>
-                    {user.email} 님
+                  <span
+                    className="hidden md:inline text-sm text-stone-600 truncate max-w-[160px]"
+                    title={user?.email ?? ""}
+                  >
+                    {(user?.email ?? "") + " 님"}
                   </span>
                   <button
                     onClick={handleLogout}
@@ -198,17 +209,22 @@ export default function HeaderNav({ lockNav = false, lockLogo = false, onOpenAut
         </nav>
       </header>
 
-      {/* 통합 인증 모달 */}
+      {/* 통합 인증 모달 (부모에서 onOpenAuth 안 넘겨주면 자체 표출) */}
       {!onOpenAuth && (
         <SignupModal
           open={open}
           initialMode={authMode}
           onClose={() => setOpen(false)}
           onSwitchMode={(m: "login" | "signup") => setAuthMode(m)}
-          onSuccess={(u) => {
-            setUser(u);
+          onSuccess={async () => {
+            try {
+              // 1) 서버 세션(login/register) 수립 직후 스토어 최신화
+              await bootstrap();
+            } catch {}
+            // 2) 모달 닫기
             setOpen(false);
-            // 저장은 모달에서 이미 처리됨 (remember에 따라 local/session)
+            // 3) 로그인 완료 후 기본 랜딩으로 이동 (프로젝트에 맞게 경로 조정)
+            navigate("/dashboard", { replace: true });
           }}
         />
       )}

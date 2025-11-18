@@ -31,6 +31,8 @@
  *     (아래 Hero 섹션에서 w-screen + 음수 마진으로 구현)
  */
 
+// NOTE: This page assumes routing is already protected by <ProtectedRoute>. No local auth-redirect.
+
 // 상단 네비게이션과 페이지를 구성하는 하위 블록(섹션/컴포넌트)들
 import HeaderNav from "@/components/HeaderNav";
 import LeftCategorySidebar from "@/components/LeftCategorySidebar";
@@ -41,26 +43,7 @@ import PersonalDex from "@/sections/PersonalDex";
 import RecordGallery from "@/sections/RecordGallery";
 import MobileCategoryGrid from "@/components/MobileCategoryGrid";
 
-import { useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "@/store/auth";
-
 export default function Dashboard() {
-  const isLoggedIn = useAuth((s) => s.isLoggedIn);
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  // 로그아웃(비로그인) 상태가 되면 즉시 로그인 전 화면으로 내보낸다.
-  useEffect(() => {
-    if (!isLoggedIn) {
-      const next = `${location.pathname}${location.search}`;
-      navigate(`/before-login?next=${encodeURIComponent(next)}`, { replace: true });
-    }
-  }, [isLoggedIn, navigate, location.pathname, location.search]);
-
-  // 내보내기 직전 UI가 잠깐 보이는 깜빡임 방지
-  if (!isLoggedIn) return null;
-
   return (
     <div
       className={

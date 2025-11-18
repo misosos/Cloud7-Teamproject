@@ -15,7 +15,7 @@
   ▸ 왜 이렇게 구성했나?
     - 로그인/회원가입 UI와 기본 검증 로직을 "재사용 가능한 하나의 컴포넌트"로 묶어두면,
       여러 페이지에서 같은 방식으로 사용할 수 있어 유지보수가 쉽습니다.
-    - 실제 서버 연동(API 호출)은 외부에서 주입(`authenticate`)하거나, services/auth.ts로 연결(TODO)합니다.
+    - 실제 서버 연동(API 호출)은 외부에서 주입(`authenticate`)하거나, 미주입 시 services/auth.ts로 자동 연결됩니다.
 
   ▸ props (외부에서 넘겨주는 값)
     - open:            모달 열림 여부(true/false)
@@ -36,6 +36,7 @@
 */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import * as authService from "@/services/auth";
 
 // 외부에서 받을 props의 타입 정의
 type Props = {
@@ -149,6 +150,55 @@ export default function SignupModal({ open, onClose, initialMode, onSuccess, aut
   // 모달이 닫혀 있으면 아무것도 렌더하지 않음
   if (!open) return null;
 
+  // 서버 인증 기본 연결(fallback): props.authenticate가 없으면 services/auth 사용
+  // 기존 fallbackAuthenticate 전부 지우고 아래로 교체
+const fallbackAuthenticate = async ({
+  mode,
+  email,
+  password,
+}: {
+  mode: "login" | "signup";
+  email: string;
+  password: string;
+}): Promise<{ email: string; [k: string]: any }> => {
+  const creds = { email, password };
+  const svc: any = authService as any;
+
+  let result: any;
+
+  if (mode === "login") {
+    const fn =
+      svc?.login ||
+      svc?.signIn ||
+      svc?.signin;
+
+    if (typeof fn !== "function") {
+      throw new Error("로그인 함수(login/signIn)가 services/auth.ts에 없습니다.");
+    }
+    // 지원: fn({email,password}) 또는 fn(email, password)
+    result = fn.length <= 1 ? await fn(creds) : await fn(email, password);
+  } else {
+    const fn =
+      svc?.register ||
+      svc?.signUp ||
+      svc?.signup ||
+      svc?.registerUser;
+
+    if (typeof fn !== "function") {
+      throw new Error("회원가입 함수(register/signUp)가 services/auth.ts에 없습니다.");
+    }
+    // 지원: fn({email,password}) 또는 fn(email, password)
+    result = fn.length <= 1 ? await fn(creds) : await fn(email, password);
+  }
+
+  // 다양한 응답 포맷 지원: { user }, { data: { user } }, 또는 바로 user
+  const user = result?.user ?? result?.data?.user ?? result;
+  if (!user || !user.email) {
+    throw new Error("서버가 유효한 사용자 정보를 반환하지 않았습니다.");
+  }
+  return user;
+};
+
   // ─────────────────────────────────────────────────────────
   // ⑫ 제출 처리: 실제 인증 시도(주입된 authenticate 사용, 없으면 TODO)
   //     - 전 단계에서 간단한 형식 검사 실패 시, 해당 입력칸에 포커스 이동
@@ -178,20 +228,12 @@ export default function SignupModal({ open, onClose, initialMode, onSuccess, aut
     try {
       setLoading(true);
 
-      // 기본 유저 객체(주입 함수가 없을 때 임시로 사용)
-      let user: { email: string; [k: string]: any } = { email };
+      // (2) 실제 인증 함수: props.authenticate 우선 사용, 없으면 fallbackAuthenticate로 서버 API 호출
+      const authFn =
+        typeof authenticate === "function" ? authenticate : fallbackAuthenticate;
 
-      // (2) 실제 인증 함수가 주입되었다면 그것을 사용
-      if (typeof authenticate === "function") {
-        user = await authenticate({ mode, email, password });
-      } else {
-        // (3) TODO: 실제 API 연동 예시 (services/auth.ts 등)
-        // import { login, signup } from "@/services/auth";
-        // const res = isSignup
-        //   ? await signup({ email, password })
-        //   : await login({ email, password });
-        // user = res.user;
-      }
+      // (3) 서버에 로그인/회원가입을 요청 (실패 시 에러 throw)
+      const user = await authFn({ mode, email, password });
 
       // (4) 상위에 유저 정보 전달 → 상위에서 상태 보관/화면 전환에 사용
       onSuccess?.(user);
@@ -207,11 +249,37 @@ export default function SignupModal({ open, onClose, initialMode, onSuccess, aut
         // 저장이 불가한 환경(사파리 시크릿 탭 등)은 조용히 무시
       }
 
+      // (6.1) 상위 콜백(onSuccess) 미제공 시를 대비한 보수적 처리:
+      // - 전역 이벤트만 의존하는 환경에서 리렌더가 안 되면 강제 새로고침/리다이렉트로 보호
+      const noConsumer = typeof onSuccess !== "function";
+      if (noConsumer) {
+        // 라우터가 /dashboard를 쓸 때를 가정해 우선 이동 시도, 실패 시 전체 리로드
+        setTimeout(() => {
+          try {
+            if (window?.location?.pathname === "/" || window?.location?.pathname === "/login") {
+              window.location.assign("/dashboard");
+            } else {
+              window.location.reload();
+            }
+          } catch {
+            window.location.reload();
+          }
+        }, 0);
+      }
+
       // (7) 성공 시 모달 닫기 — 이후 이동은 상위 라우팅 로직에서 처리
       onClose();
     } catch (err: any) {
-      // 서버/네트워크 오류 또는 authenticate 내부에서 던진 에러 메시지
-      setError(err?.message ?? "처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+      const status = err?.response?.status ?? err?.status;
+      let msg =
+        err?.response?.data?.message ||
+        err?.data?.message ||
+        err?.message ||
+        "이메일 또는 비밀번호가 올바르지 않습니다.";
+
+      if (status === 401) msg = "이메일 또는 비밀번호가 올바르지 않습니다.";
+      if (status === 409) msg = "이미 가입된 이메일입니다.";
+      setError(String(msg));
     } finally {
       setLoading(false);
     }
@@ -367,6 +435,7 @@ export default function SignupModal({ open, onClose, initialMode, onSuccess, aut
                 onClick={() => {
                   const next = isSignup ? "login" : "signup";
                   setMode(next);
+                  setError(null);
                   onSwitchMode?.(next);
                 }}
                 className="text-sm text-amber-700 hover:text-amber-800 disabled:opacity-50"

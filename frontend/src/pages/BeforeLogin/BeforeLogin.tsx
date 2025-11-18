@@ -3,14 +3,14 @@
  * ─────────────────────────────────────────────────────────
  * 목적: 아직 로그인하지 않은 사용자가 처음 보게 되는 랜딩 화면입니다.
  *       - 상단 헤더에서는 서비스 진입(메뉴/로고)을 잠그고, 로그인/회원가입 버튼만 허용합니다.
- *       - 로그인/회원가입(모달) 성공 시, 원래 가려던 페이지(next)나 홈("/")로 이동시킵니다.
+ *       - 로그인/회원가입(모달) 성공 시, 원래 가려던 페이지(next)나 대시보드("/dashboard")로 이동시킵니다.
  *
  * 이 파일을 보면 좋은 사람
  *  - 기획/디자인/QA: 로그인 전 화면의 **흐름**(잠금/모달/리다이렉트)을 이해할 때
  *
  * 핵심 동작 요약
  *  1) URL에 `?next=/원래경로`가 있을 수 있습니다. (보호 페이지에서 튕겨온 경우)
- *  2) 이미 로그인 상태라면 즉시 next(또는 홈)로 이동합니다.
+ *  2) 이미 로그인 상태라면 즉시 next(또는 /dashboard)로 이동합니다.
  *  3) 모달에서 로그인/회원가입이 성공하면 next(또는 홈)로 이동합니다.
  */
 
@@ -20,26 +20,28 @@ import HeaderNav from "@/components/HeaderNav";        // 상단 네비게이션
 import SignupModal from "@/components/SignupModal";    // 로그인/회원가입 통합 모달
 import { useLocation, useNavigate } from "react-router-dom"; // URL 쿼리와 페이지 이동을 위한 라우터 훅
 import { useAuth } from "@/store/auth";
-import apiClient from "@/services/apiClient";
+
+const DEFAULT_AFTER_LOGIN = "/dashboard";
 
 /**
  * 안전한 next 경로 계산
  * - 외부 URL(open redirect) 방지: 반드시 "/"로 시작하고 "//"나 "http"로 시작하지 않도록 제한
  * - 디코딩 오류 등 예외 발생 시 "/"로 대체
  */
-function resolveNext(search: string): string {
+function resolveNext(search: string, fallback = DEFAULT_AFTER_LOGIN): string {
   const params = new URLSearchParams(search);
-  const raw = params.get("next") || "/";
+  const raw = params.get("next") || fallback;
   try {
     const decoded = decodeURIComponent(raw);
-    // 내부 경로만 허용 (예: "/dashboard", "/settings")
-    if (decoded.startsWith("/") && !decoded.startsWith("//")) {
+    // 내부 경로만 허용: 반드시 "/"로 시작하되, "//", "http:", "https:", "javascript:" 등 금지
+    // ^/(?!/)  => "/"로 시작하면서 다음 문자가 "/"가 아닌 경우 (이중 슬래시 금지)
+    if (/^\/(?!\/)/.test(decoded)) {
       return decoded;
     }
   } catch {
     // ignore
   }
-  return "/";
+  return fallback;
 }
 
 /**
@@ -53,6 +55,7 @@ export default function BeforeLogin() {
   const location = useLocation();
   const navigate = useNavigate();
   const isLoggedIn = useAuth((s) => s.isLoggedIn);
+  const bootstrap = useAuth((s) => s.bootstrap);
 
   // 인증 모달 열림 상태 (true=열림, false=닫힘)
   const [open, setOpen] = useState(false);
@@ -60,6 +63,10 @@ export default function BeforeLogin() {
   const [initialMode, setInitialMode] = useState<"login" | "signup">("login");
 
   const handledAuthSuccess = useRef(false); // React 18/StrictMode 중복 호출 방지 (idempotent 가드)
+
+  useEffect(() => {
+    if (!open) handledAuthSuccess.current = false;
+  }, [open]);
 
   // 로그인/회원가입 버튼 클릭 시 모달 열기
   const openAuth = (mode: "login" | "signup") => {
@@ -74,16 +81,9 @@ export default function BeforeLogin() {
    */
   useEffect(() => {
     const dest = resolveNext(location.search);
-
     if (isLoggedIn) {
       navigate(dest, { replace: true });
-      return;
     }
-
-    // (보조) 커스텀 로그인 이벤트를 듣고 이동 — 모달/헤더에서 브로드캐스트할 때 사용
-    const onLogin = () => navigate(dest, { replace: true });
-    window.addEventListener("auth:login", onLogin);
-    return () => window.removeEventListener("auth:login", onLogin);
   }, [isLoggedIn, location.search, navigate]);
 
   return (
@@ -132,73 +132,30 @@ export default function BeforeLogin() {
       {/**
        * 통합 인증 모달(SignupModal)
        * - `initialMode`로 로그인/회원가입 탭 중 무엇을 먼저 보여줄지 결정합니다.
-       * - onSuccess: 인증 성공 시 next(또는 홈)로 이동합니다.
+       * - onSuccess: 인증 성공 시 next(또는 /dashboard)로 이동합니다.
        */}
       <SignupModal
         open={open}
         initialMode={initialMode}
-        onClose={() => setOpen(false)}
+        onClose={() => {
+          setOpen(false);
+          handledAuthSuccess.current = false;
+        }}
         onSwitchMode={(m: "login" | "signup") => setInitialMode(m)}
-        onSuccess={async (user) => {
+        onSuccess={async () => {
           // React 18 StrictMode나 중복 트리거에 대비: 성공 처리 한 번만 수행
           if (handledAuthSuccess.current) return;
           handledAuthSuccess.current = true;
-          /**
-           * 1) 서버 세션 쿠키 기반으로 /auth/me를 호출해 사용자 정보를 동기화
-           *    - apiClient가 AxiosResponse<T> 또는 T 자체를 반환하는 두 케이스를 모두 지원
-           * 2) 스토어의 User 타입(name/email: string 필수)에 맞춰 안전하게 기본값 채움
-           * 3) 실패 시 모달이 넘긴 user로 폴백
-           */
-          type MeUser = { id?: string; email?: string; name?: string };
-          type MeResponse = { user: MeUser } | MeUser;
 
+          // 1) 서버 세션 쿠키 기반으로 스토어 부트스트랩 (/auth/me 호출 → 상태 동기화)
           try {
-            const res = await apiClient.get<MeResponse>("/auth/me");
-            // AxiosResponse 또는 data 직접 반환 케이스 모두 처리
-            const payload: any = (res as any)?.data ?? res;
-            const rawMe: any = payload?.user ?? payload;
-
-            // 스토어 User 타입에 맞게 안전 사용자 구성 (name/email은 string 보장)
-            const safeUser = rawMe
-              ? {
-                  id: typeof rawMe.id === "string"
-                    ? rawMe.id
-                    : (typeof rawMe.email === "string" ? rawMe.email : "unknown"),
-                  email: typeof rawMe.email === "string" ? rawMe.email : "",
-                  name:
-                    typeof rawMe.name === "string"
-                      ? rawMe.name
-                      : (typeof rawMe.email === "string" ? rawMe.email.split("@")[0] : "User"),
-                }
-              : null;
-
-            if (safeUser) {
-              // 세션 쿠키 기반이라 토큰은 보통 사용하지 않음
-              useAuth.getState().login?.({ user: safeUser, token: undefined });
-            } else {
-              // 폴백: 모달에서 전달된 user 사용 (string 보장)
-              const rawEmail = (user as any)?.email;
-              const email = typeof rawEmail === "string" ? rawEmail : "user@example.com";
-              const name = (user as any)?.name ?? email.split("@")[0];
-              const id = (user as any)?.id ?? email;
-              useAuth.getState().login?.({
-                user: { id: String(id), name: String(name), email: String(email) },
-                token: "LOCAL_FAKE_TOKEN",
-              });
-            }
+            await bootstrap();
           } catch {
-            // 네트워크/서버 오류 시에도 폴백 적용 (string 보장)
-            const rawEmail = (user as any)?.email;
-            const email = typeof rawEmail === "string" ? rawEmail : "user@example.com";
-            const name = (user as any)?.name ?? email.split("@")[0];
-            const id = (user as any)?.id ?? email;
-            useAuth.getState().login?.({
-              user: { id: String(id), name: String(name), email: String(email) },
-              token: "LOCAL_FAKE_TOKEN",
-            });
+            // 서버/네트워크 오류가 있어도 다음 화면으로 이동하면
+            // 보호 라우터가 isLoggedIn 여부에 따라 적절히 처리함
           }
 
-          // 3) 이동: 안전하게 산출한 next로 이동
+          // 2) 이동: 안전하게 산출한 next로 이동
           const dest = resolveNext(location.search);
           navigate(dest, { replace: true });
         }}
