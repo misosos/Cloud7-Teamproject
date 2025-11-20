@@ -3,6 +3,8 @@
 cd frontend
 npm install
 
+# .env 파일 만들기 (.env.example 파일 내용 복붙)
+
 # 개발 서버 실행
 npm run dev
 
@@ -20,7 +22,6 @@ npm run dev
 ### 1) 의존성 설치 (backend)
 ```bash
 cd backend
-
 npm install
 
 # .env 파일 만들기 (.env.example 파일 내용 복붙)
@@ -56,7 +57,7 @@ npx prisma migrate deploy
 npx prisma db seed
 ```
 
-### 3) 테스트 (터미널 창 2개 띄우기)
+## 테스트 (터미널 창 2개 띄우기)
 ```bash
 # 1) 프론트엔드 개발 서버 실행 
 cd frontend
