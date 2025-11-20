@@ -7,7 +7,6 @@
  *  - 전역 인증 스토어에서 "로그인 체크 중인지 / 로그인 되어 있는지"만 구독
  *  - 아직 로그인/세션 체크 중이면 → 절대 바로 튕기지 않고, 로딩 화면만 보여줌
  *  - 체크가 끝난 뒤에만(isLoggedIn 값이 확정된 뒤에만) 접근 제어를 수행
- *  - next 파라미터에 원래 가려던 경로를 인코딩해 두었다가, 로그인 후 복귀에 사용
  *
  * 사용 예시
  *  <Route element={<ProtectedRoute />}>
@@ -15,7 +14,7 @@
  *  </Route>
  */
 
-import { useMemo, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuthGate } from "@/store/authStore"; // ✅ 인증 게이트 훅
 
@@ -29,15 +28,6 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   // 2) 전역 인증 상태 (게이트 훅으로 통일)
   const { checking, isLoggedIn } = useAuthGate();
-
-  // 3) 로그인 후 돌아올 목적지(next) 문자열을 미리 계산해 둠
-  const next = useMemo(
-    () =>
-      encodeURIComponent(
-        `${location.pathname}${location.search}${location.hash}`
-      ),
-    [location.pathname, location.search, location.hash]
-  );
 
   // ✅ 안전장치:
   // 만약 /before-login 라우트 자체를 ProtectedRoute로 감싸버리면
@@ -61,7 +51,10 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   // 5) 로그인 체크가 끝났고, 미로그인 상태라면
   //    → 로그인 전 페이지로 보내되, 로그인 성공 시 돌아올 목적지(next)를 함께 전달
   if (!isLoggedIn) {
-    return <Navigate to={`/before-login?next=${next}`} replace />;
+    // 미로그인 상태라면 로그인 전 페이지로 이동
+    // (현재 요구사항상, 로그인 성공 후에는 항상 "/dashboard"로 보내므로
+    //  별도의 next 쿼리 파라미터는 사용하지 않습니다.)
+    return <Navigate to="/before-login" replace />;
   }
 
   // 6) 로그인 되어 있다면 → 보호된 자식 라우트를 그대로 렌더

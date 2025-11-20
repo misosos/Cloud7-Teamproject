@@ -3,48 +3,26 @@
  * ─────────────────────────────────────────────────────────
  * 목적: 아직 로그인하지 않은 사용자가 처음 보게 되는 랜딩 화면입니다.
  *       - 상단 헤더에서는 서비스 진입(메뉴/로고)을 잠그고, 로그인/회원가입 버튼만 허용합니다.
- *       - 로그인/회원가입(모달) 성공 시, 원래 가려던 페이지(next)나 대시보드("/dashboard")로 이동시킵니다.
+ *       - 로그인/회원가입(모달) 성공 시, 항상 대시보드("/dashboard")로 이동시킵니다.
  *
  * 이 파일을 보면 좋은 사람
  *  - 기획/디자인/QA: 로그인 전 화면의 **흐름**(잠금/모달/리다이렉트)을 이해할 때
  *
  * 핵심 동작 요약
- *  1) URL에 `?next=/원래경로`가 있을 수 있습니다. (보호 페이지에서 튕겨온 경우)
- *  2) 이미 로그인 상태라면 즉시 next(또는 /dashboard)로 이동합니다.
- *  3) 모달에서 로그인/회원가입이 성공하면 next(또는 /dashboard)로 이동합니다.
+ *  1) 아직 로그인/세션 확인 중(checking === true)이면 로딩 화면만 보여준다.
+ *  2) 이미 로그인 상태라면 이 페이지에 올 일이 없으므로 즉시 "/dashboard"로 보낸다.
+ *  3) 모달에서 로그인/회원가입이 성공하면 "/dashboard"로 이동한다.
  */
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import Hero from "@/sections/Hero"; // 상단 대표 배너(풀-블리드로 보이는 시각 요소)
 import HeaderNav from "@/components/HeaderNav"; // 상단 네비게이션 (여기서는 잠금 모드로 사용)
 import SignupModal from "@/components/SignupModal"; // 로그인/회원가입 통합 모달
-import { useLocation, useNavigate } from "react-router-dom"; // URL 쿼리와 페이지 이동을 위한 라우터 훅
-import { useAuth, useAuthGate } from "@/store/authStore"; // ✅ 게이트 훅까지 함께 사용
+import { useNavigate } from "react-router-dom"; // 페이지 이동을 위한 라우터 훅
+import { useAuth, useAuthGate } from "@/store/authStore"; // ✅ 전역 인증 스토어 + 게이트 훅
 
-const DEFAULT_AFTER_LOGIN = "/dashboard";
-
-/**
- * 안전한 next 경로 계산
- * - 외부 URL(open redirect) 방지: 반드시 "/"로 시작하고 "//"나 "http"로 시작하지 않도록 제한
- * - 디코딩 오류 등 예외 발생 시 fallback으로 대체
- */
-function resolveNext(search: string, fallback = DEFAULT_AFTER_LOGIN): string {
-  const params = new URLSearchParams(search);
-  const raw = params.get("next") || fallback;
-
-  try {
-    const decoded = decodeURIComponent(raw);
-    // 내부 경로만 허용: 반드시 "/"로 시작하되, "//", "http:", "https:", "javascript:" 등 금지
-    // ^/(?!/)  => "/"로 시작하면서 다음 문자가 "/"가 아닌 경우 (이중 슬래시 금지)
-    if (/^\/(?!\/)/.test(decoded)) {
-      return decoded;
-    }
-  } catch {
-    // 디코딩 실패 시 fallback 사용
-  }
-
-  return fallback;
-}
+// 로그인 성공 후 이동할 경로 (지금은 항상 대시보드로 고정)
+const AFTER_LOGIN_PATH = "/dashboard";
 
 /**
  * 로그인 전 메인 화면 컴포넌트
@@ -53,13 +31,16 @@ function resolveNext(search: string, fallback = DEFAULT_AFTER_LOGIN): string {
  * - 모달(SignupModal)에서 실제 인증을 수행합니다.
  */
 export default function BeforeLogin() {
-  // 현재 주소/쿼리 파싱, 페이지 이동 도구
-  const location = useLocation();
   const navigate = useNavigate();
 
   // ✅ 다른 곳(HomeGate/ProtectedRoute)과 동일한 기준으로 로그인 상태 파악
-  const { checking, isLoggedIn } = useAuthGate(); // checking: 아직 로그인/세션 체크 중인지
-  const bootstrap = useAuth((s) => s.bootstrap); // 스토어 부트스트랩 함수(/auth/me)
+  //  - checking: 아직 서버에 /auth/me 등을 날려서 로그인/세션 체크 중인지 여부
+  //  - isLoggedIn: 최종적으로 로그인된 상태인지 여부
+  const { checking, isLoggedIn } = useAuthGate();
+
+  // 전역 auth 스토어 액션들
+  const bootstrap = useAuth((s) => s.bootstrap);
+  const setLoggedIn = useAuth((s) => s.setLoggedIn);
 
   // 인증 모달 열림 상태 (true=열림, false=닫힘)
   const [open, setOpen] = useState(false);
@@ -68,19 +49,6 @@ export default function BeforeLogin() {
 
   // React 18/StrictMode 등에서 onSuccess가 중복 호출되는 것을 방지하는 가드
   const handledAuthSuccess = useRef(false);
-
-  // 현재 URL 기준으로 "로그인 후 이동할 목적지"를 한 번 계산해 재사용
-  const nextDest = useMemo(
-    () => resolveNext(location.search),
-    [location.search]
-  );
-
-  // 모달이 닫힐 때마다 "성공 처리" 플래그 초기화
-  useEffect(() => {
-    if (!open) {
-      handledAuthSuccess.current = false;
-    }
-  }, [open]);
 
   // 로그인/회원가입 버튼 클릭 시 모달 열기
   const openAuth = (mode: "login" | "signup") => {
@@ -91,28 +59,37 @@ export default function BeforeLogin() {
   /**
    * [중요] 자동 이동(useEffect)
    * - 로그인/세션 체크가 끝난 뒤(checking === false)에만 isLoggedIn을 신뢰합니다.
-   * - 이미 로그인 상태라면 즉시 next(또는 /dashboard)로 이동합니다.
+   * - 이미 로그인 상태라면 즉시 "/dashboard"로 이동합니다.
    *   (예: 새로고침 후 /before-login으로 온 경우)
    */
   useEffect(() => {
     // 아직 로그인/세션 체크 중이면 아무 것도 하지 않음
     if (checking) return;
+
     // 미로그인 상태라면 이 페이지를 그대로 보여줌
     if (!isLoggedIn) return;
 
-    // 이미 로그인 상태에서 /before-login 진입 시 → 자동으로 보호 페이지 또는 대시보드로 보냄
-    navigate(nextDest, { replace: true });
-  }, [checking, isLoggedIn, nextDest, navigate]);
+    // 이미 로그인 상태에서 /before-login 진입 시 → 자동으로 대시보드로 보냄
+    navigate(AFTER_LOGIN_PATH, { replace: true });
+  }, [checking, isLoggedIn, navigate]);
 
   /**
    * 모달 안에서 로그인/회원가입이 성공했을 때 호출되는 콜백
    * - 1) 세션 쿠키 기반으로 /auth/me 호출 → 전역 auth 스토어 동기화
-   * - 2)  next(또는 /dashboard)로 페이지 이동
+   * - 2) "/dashboard"로 페이지 이동
    */
-  const handleAuthSuccess = async () => {
+  const handleAuthSuccess = async (user: any) => {
     // React 18 StrictMode나 중복 트리거에 대비: 성공 처리 한 번만 수행
     if (handledAuthSuccess.current) return;
     handledAuthSuccess.current = true;
+
+    // 1차로, 서버 응답에서 받은 사용자 정보로 전역 auth 상태를 즉시 갱신
+    //    → isLoggedIn 이 바로 true가 되어 ProtectedRoute가 즉시 대시보드를 허용합니다.
+    try {
+      setLoggedIn(user as any);
+    } catch (e) {
+      console.error("setLoggedIn 호출 중 오류:", e);
+    }
 
     try {
       // ✅ 로그인 직후에는 강제로 세션 재동기화
@@ -125,8 +102,9 @@ export default function BeforeLogin() {
 
     // 모달 닫고
     setOpen(false);
-    // 안전하게 계산된 nextDest로 이동
-    navigate(nextDest, { replace: true });
+
+    // 무조건 "/dashboard"로 이동
+    navigate(AFTER_LOGIN_PATH, { replace: true });
   };
 
   // ✅ 아직 로그인/세션 상태를 확인하는 중이라면,
@@ -185,7 +163,7 @@ export default function BeforeLogin() {
       {/**
        * 통합 인증 모달(SignupModal)
        * - `initialMode`로 로그인/회원가입 탭 중 무엇을 먼저 보여줄지 결정합니다.
-       * - onSuccess: 인증 성공 시 next(또는 /dashboard)로 이동합니다.
+       * - onSuccess: 인증 성공 시 "/dashboard"로 이동합니다.
        */}
       <SignupModal
         open={open}

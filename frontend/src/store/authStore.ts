@@ -54,6 +54,11 @@ type AuthState = {
   login: (payload: { user: User; token?: string | null }) => void;
   /** (호환용) setSession: login과 같은 역할, 네이밍만 다른 메서드 */
   setSession: (payload: { user: User; token?: string | null }) => void;
+  /**
+   * 로그인 여부만 즉시 반영하고 싶을 때 사용하는 헬퍼
+   * - user를 그대로 저장하고 isLoggedIn/ready만 맞춰줍니다.
+   */
+  setLoggedIn: (user: User | null) => void;
   /** 로그인 API를 직접 호출하고 결과를 스토어에 반영하는 편의 메서드 */
   loginWithCredentials: (email: string, password: string) => Promise<User | null>;
   /** 회원가입 API를 직접 호출하고 결과를 스토어에 반영하는 편의 메서드 */
@@ -295,6 +300,21 @@ export const useAuth = create<AuthState>()(
       },
 
       /**
+       * setLoggedIn
+       *
+       * - user만 받아서 로그인 여부를 즉시 반영하는 헬퍼
+       * - 토큰은 변경하지 않고, user / isLoggedIn / ready만 갱신
+       */
+      setLoggedIn: (user) => {
+        const nextIsLoggedIn = !!user;
+        set({
+          user,
+          isLoggedIn: nextIsLoggedIn,
+          ready: true,
+        });
+      },
+
+      /**
        * 로그아웃 처리
        *
        * - Zustand 스토어 상태를 초기화
@@ -378,6 +398,7 @@ export const selectBootstrap = (s: AuthState) => s.bootstrap;
 export const selectLogout = (s: AuthState) => s.logout;
 export const selectLogin = (s: AuthState) => s.login;
 export const selectSetSession = (s: AuthState) => s.setSession;
+export const selectSetLoggedIn = (s: AuthState) => s.setLoggedIn;
 export const selectLoginWithCredentials = (s: AuthState) => s.loginWithCredentials;
 export const selectRegisterWithCredentials = (s: AuthState) =>
   s.registerWithCredentials;
@@ -415,6 +436,7 @@ export const useAuthBootstrap = () => useAuth(selectBootstrap);
 export const useAuthLogout = () => useAuth(selectLogout);
 export const useAuthLogin = () => useAuth(selectLogin);
 export const useAuthSetSession = () => useAuth(selectSetSession);
+export const useAuthSetLoggedIn = () => useAuth(selectSetLoggedIn);
 export const useAuthLoginWithCredentials = () =>
   useAuth(selectLoginWithCredentials);
 export const useAuthRegisterWithCredentials = () =>
