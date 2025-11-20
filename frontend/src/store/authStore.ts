@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import apiClient from "@/services/apiClient";
@@ -36,7 +37,7 @@ export type User = {
 };
 
 type AuthState = {
-  /** 하이드레이션(복원)/부팅 체크 완료 여부 */
+  /** 로그인/세션 체크(부트스트랩 + 하이드레이션)가 끝났는지 여부 (true일 때만 isLoggedIn을 신뢰할 수 있음) */
   ready: boolean;
   /** 로그인 여부 (user 존재 여부로 파생) */
   isLoggedIn: boolean;
@@ -117,11 +118,37 @@ export const useAuth = create<AuthState>()(
         set({ bootstrapping: true });
 
         try {
-          // apiClient.get는 "응답 본문(data)"을 바로 반환하는 형태라고 가정
-          type MeResponse = { ok?: boolean; user?: User | null };
-          const me = (await apiClient.get("/auth/me")) as MeResponse;
+          // /auth/me 응답 형태를 최대한 유연하게 처리
+          // 예시 허용 형태:
+          // 1) { ok: true, user: { ... } }
+          // 2) { ok: true, data: { user: { ... } } }
+          // 3) { ok: true, data: { ...userFields } }
+          // 4) { id, email, ... } (user 객체 자체)
+          const raw = await apiClient.get("/auth/me");
 
-          const nextUser: User | null = me?.user ?? null;
+          let nextUser: User | null = null;
+
+          if (raw && typeof raw === "object") {
+            const anyRaw = raw as any;
+
+            if ("user" in anyRaw) {
+              // { ok, user }
+              nextUser = (anyRaw.user ?? null) as User | null;
+            } else if ("data" in anyRaw && anyRaw.data && typeof anyRaw.data === "object") {
+              const data = anyRaw.data as any;
+              if ("user" in data) {
+                // { ok, data: { user } }
+                nextUser = (data.user ?? null) as User | null;
+              } else {
+                // { ok, data: { ...userFields } } 라고 가정
+                nextUser = data as User;
+              }
+            } else {
+              // 바로 user 객체라고 가정
+              nextUser = anyRaw as User;
+            }
+          }
+
           const nextIsLoggedIn = !!nextUser;
 
           // 사용자/로그인 상태가 이전과 동일하면 ready/bootstrapping만 보정
@@ -175,13 +202,33 @@ export const useAuth = create<AuthState>()(
        */
       loginWithCredentials: async (email, password) => {
         try {
-          const res = await apiClient.post("/auth/login", { email, password });
-          // 백엔드 응답 형태가 { user } 또는 { data: { user } } 인 경우 모두 허용
-          const user = (res as any)?.user ?? (res as any)?.data?.user ?? null;
+          const raw = await apiClient.post("/auth/login", { email, password });
+
+          let user: User | null = null;
+
+          if (raw && typeof raw === "object") {
+            const anyRaw = raw as any;
+
+            if ("user" in anyRaw) {
+              // { ok, user }
+              user = (anyRaw.user ?? null) as User | null;
+            } else if ("data" in anyRaw && anyRaw.data && typeof anyRaw.data === "object") {
+              const data = anyRaw.data as any;
+              if ("user" in data) {
+                // { ok, data: { user } }
+                user = (data.user ?? null) as User | null;
+              } else {
+                // { ok, data: { ...userFields } } 라고 가정
+                user = data as User;
+              }
+            }
+          }
+
           if (user) {
             set({ user, token: null, isLoggedIn: true, ready: true });
-            return user as User;
+            return user;
           }
+
           return null;
         } catch {
           // 에러 내용은 상위(컴포넌트/서비스)에서 처리하도록 null만 반환
@@ -198,12 +245,33 @@ export const useAuth = create<AuthState>()(
        */
       registerWithCredentials: async (email, password, name) => {
         try {
-          const res = await apiClient.post("/auth/register", { email, password, name });
-          const user = (res as any)?.user ?? (res as any)?.data?.user ?? null;
+          const raw = await apiClient.post("/auth/register", { email, password, name });
+
+          let user: User | null = null;
+
+          if (raw && typeof raw === "object") {
+            const anyRaw = raw as any;
+
+            if ("user" in anyRaw) {
+              // { ok, user }
+              user = (anyRaw.user ?? null) as User | null;
+            } else if ("data" in anyRaw && anyRaw.data && typeof anyRaw.data === "object") {
+              const data = anyRaw.data as any;
+              if ("user" in data) {
+                // { ok, data: { user } }
+                user = (data.user ?? null) as User | null;
+              } else {
+                // { ok, data: { ...userFields } } 라고 가정
+                user = data as User;
+              }
+            }
+          }
+
           if (user) {
             set({ user, token: null, isLoggedIn: true, ready: true });
-            return user as User;
+            return user;
           }
+
           return null;
         } catch {
           return null;
@@ -351,3 +419,37 @@ export const useAuthLoginWithCredentials = () =>
   useAuth(selectLoginWithCredentials);
 export const useAuthRegisterWithCredentials = () =>
   useAuth(selectRegisterWithCredentials);
+
+/**
+ * 라우팅/화면 전환 시 사용할 인증 게이트 훅
+ *
+ * - checking === true 인 동안에는 "아직 로그인 체크 중" 상태
+ *   → 이때는 로그인 전/후 화면 대신 로딩 스피너나 깜빡임 방지용 화면을 보여주는 것이 좋습니다.
+ * - checking === false 가 된 이후에만 isLoggedIn 값을 보고
+ *   로그인 전/후 화면을 판별하면, 초기 진입시 깜빡이거나
+ *   여러 번 로그인 시도해야 되는 문제를 줄일 수 있습니다.
+ *
+ * 사용 예시:
+ *   const { checking, isLoggedIn } = useAuthGate();
+ *   if (checking) return <LoadingScreen />;
+ *   return isLoggedIn ? <Dashboard /> : <BeforeLogin />;
+ */
+export const useAuthGate = () => {
+  const ready = useAuth(selectReady);
+  const isLoggedIn = useAuth(selectIsLoggedIn);
+  const bootstrap = useAuth(selectBootstrap);
+  const bootstrapping = useAuth((s) => s.bootstrapping);
+
+  // 처음 진입 시, 아직 ready가 아니고 bootstrapping도 아니라면 /auth/me로 세션 동기화 시도
+  useEffect(() => {
+    if (!ready && !bootstrapping) {
+      bootstrap();
+    }
+  }, [ready, bootstrapping, bootstrap]);
+
+  return {
+    // ready가 아니거나 bootstrapping 중이면 "아직 로그인 체크 중"으로 간주
+    checking: !ready || bootstrapping,
+    isLoggedIn,
+  };
+};
