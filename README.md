@@ -1,12 +1,10 @@
 ## Frontend 초기 설정
 ```bash
-# 1) 설치
 cd frontend
 npm install
 
-# 2) 개발 서버 실행 
+# 개발 서버 실행
 npm run dev
-# http://localhost:5173 (Vite 기본 포트)
 
 ```
 > **문제 해결:** `vite: command not found` 에러가 발생하면 아래를 한 번만 설치 후 다시 실행하세요.
@@ -17,19 +15,15 @@ npm run dev
 > npm run dev
 > ```
 
-## Backend 초기 설정
-```bash
-cd backend
-npm install
-# .env 파일 만들기 (.env.example 파일 내용 복붙)
-npm run dev
-```
-
-## Database & Session 설정
+## Backend 초기 설정 & Database & Session 설정
 
 ### 1) 의존성 설치 (backend)
 ```bash
 cd backend
+
+npm install
+
+# .env 파일 만들기 (.env.example 파일 내용 복붙)
 
 # Prisma & DB 클라이언트
 npm i @prisma/client
@@ -47,7 +41,7 @@ npm i -D @types/cors
 npm i helmet morgan express-rate-limit
 ```
 
-### 2) Prisma 준비
+### 2) Prisma 준비 (SQLite)
 ```bash
 # Prisma 클라이언트 생성
 npx prisma generate
@@ -62,6 +56,14 @@ npx prisma migrate deploy
 npx prisma db seed
 ```
 
-### 3) 로컬 개발 DB (SQLite) 권장
-- 로컬 개발은 빠른 시작을 위해 **SQLite** 사용(파일: `backend/prisma/dev.db`).
-- 추후 다른 DB 엔진 사용하려면 DATABASE_URL만 교체하면 됨!
+### 3) 테스트 (터미널 창 2개 띄우기)
+```bash
+# 1) 프론트엔드 개발 서버 실행 
+cd frontend
+npm run dev
+
+# 2) 백엔드 개발 서버 실행
+cd backend
+npm run dev
+
+```
