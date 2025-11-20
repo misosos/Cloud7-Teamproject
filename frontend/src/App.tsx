@@ -28,7 +28,7 @@ import TasteList from "@/pages/TasteRecord/TasteList"; // 기록 목록(보호 �
 import TasteDetail from "@/pages/TasteRecord/TasteDetail"; // 기록 상세(보호 라우트 내부)
 import BeforeLogin from "@/pages/BeforeLogin/BeforeLogin"; // 로그인 전 랜딩 페이지
 import ProtectedRoute from "@/routes/ProtectedRoute"; // 로그인 필요 가드
-import { useAuth } from "@/store/auth"; // 전역 인증 상태(Zustand)
+import { useAuth } from "@/store/authStore"; // 전역 인증 상태(Zustand)
 
 /**
  * HomeGate
@@ -38,7 +38,7 @@ import { useAuth } from "@/store/auth"; // 전역 인증 상태(Zustand)
  * - 최초 진입 시 /auth/me(세션 확인)를 한 번 호출해 스토어를 부팅(hydration)합니다.
  */
 function HomeGate() {
-  // ✅ Zustand는 "원시값(selector) 구독"이 안전합니다. 객체 리턴은 리렌더 루프를 유발할 수 있어요.
+  // Zustand는 "원시값(selector) 구독"이 안전합니다. 객체 리턴은 리렌더 루프를 유발할 수 있어요.
   const ready = useAuth((s) => s.ready);            // 부팅(/auth/me) 완료 플래그
   const isLoggedIn = useAuth((s) => s.isLoggedIn);  // 로그인 여부
   const bootstrap = useAuth((s) => s.bootstrap);    // 스토어 초기화 함수

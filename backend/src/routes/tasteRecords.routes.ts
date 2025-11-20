@@ -1,22 +1,51 @@
 // backend/src/routes/tasteRecords.routes.ts
+// ============================================================
+// 취향 기록(TasteRecord) API 라우터
+// ------------------------------------------------------------
+// 이 라우터는 "취향 기록" CRUD 중 일부를 담당합니다.
+//
+//   - [POST] /api/taste-records      : 취향 기록 생성
+//   - [GET]  /api/taste-records      : 내 취향 기록 목록 조회
+//   - [GET]  /api/taste-records/:id  : 내 특정 취향 기록 상세 조회
+//
+// app.ts / routes/index.ts 에서:
+//   app.use('/api', routes);
+//   routes.use('/taste-records', tasteRecordsRouter);
+//
+// 와 같은 식으로 마운트된다고 가정합니다.
+// ============================================================
+
 import { Router, Request, Response, NextFunction } from 'express';
 import authRequired from '../middlewares/authRequired';
-import { PrismaClient } from '@prisma/client';
+import {
+  createTasteRecord,
+  getTasteRecordsByUser,
+  getTasteRecordByIdForUser,
+} from '../services/tasteRecord.service';
 
-// Prisma 클라이언트 인스턴스 (필요 시 공용 인스턴스로 교체 가능)
-const prisma = new PrismaClient();
-
-/**
- * 로그인된 유저 정보 타입 보완
- * - currentUser는 프로젝트 전역 미들웨어에서 주입된다고 가정
- * - session은 이미 express-session 타입에 정의되어 있으므로 따로 재정의하지 않음
- */
+// ============================================================
+// 인증 요청 타입 보완: AuthedRequest
+// ------------------------------------------------------------
+// - currentUser: authRequired 미들웨어에서 주입된다고 가정
+//   (req.currentUser = req.session.user 형태)
+// ============================================================
 type AuthedRequest = Request & {
   currentUser?: { id: string; email?: string };
 };
-/**
- * Request에서 현재 로그인한 userId(Int)를 안전하게 꺼내는 헬퍼
- */
+
+// ============================================================
+// 헬퍼 함수: getUserId
+// ------------------------------------------------------------
+// Request에서 현재 로그인한 userId(Int)를 안전하게 꺼내는 유틸입니다.
+//
+// - 우선순위:
+//   1) req.currentUser?.id (authRequired에서 넣어준 값)
+//   2) req.session.user?.id (혹시 currentUser가 없을 경우 대비)
+//
+// - 반환:
+//   - 정수로 변환 가능한 경우: number
+//   - 없거나 NaN인 경우: null
+// ============================================================
 function getUserId(req: AuthedRequest): number | null {
   const sessionUser = (req as any).session?.user as
     | { id?: string }
@@ -35,39 +64,27 @@ function getUserId(req: AuthedRequest): number | null {
   return num;
 }
 
-/**
- * Prisma TasteRecord → 프론트에서 사용하는 형태로 직렬화
- * - desc: null 방지
- * - content: null 방지
- * - tagsJson: string → string[] 로 파싱
- * - createdAt: Date → ISO 문자열
- */
-function serialize(record: any) {
-  return {
-    id: record.id,
-    title: record.title,
-    desc: record.desc ?? '',
-    content: record.content ?? '',
-    category: record.category,
-    tags: record.tagsJson ? (JSON.parse(record.tagsJson) as string[]) : [],
-    thumb: record.thumb ?? null,
-    createdAt: record.createdAt.toISOString(),
-  };
-}
-
 const router = Router();
 
-// 🔒 이 라우터 아래의 모든 엔드포인트는 로그인 필수
+// ============================================================
+// 전역 인증 보호
+// ------------------------------------------------------------
+// 이 라우터 아래의 모든 엔드포인트는 로그인 필수입니다.
+// - authRequired 미들웨어에서 세션을 확인하고,
+//   실패 시 401(UNAUTHORIZED) 응답을 반환합니다.
+// ============================================================
 router.use(authRequired);
 
-/**
- * [POST] /api/taste-records
- * 취향 기록 생성
- */
+// ============================================================
+// [POST] /api/taste-records
+// ------------------------------------------------------------
+// 취향 기록 생성
+// ============================================================
 router.post(
   '/',
   async (req: AuthedRequest, res: Response, next: NextFunction) => {
     try {
+      // 1) 로그인된 사용자 ID 추출
       const userId = getUserId(req);
       if (!userId) {
         return res.status(401).json({
@@ -77,6 +94,7 @@ router.post(
         });
       }
 
+      // 2) 요청 바디 구조 분해
       const { title, caption, content, category, tags } = req.body as {
         title?: string;
         caption?: string;
@@ -85,6 +103,7 @@ router.post(
         tags?: string[];
       };
 
+      // 3) 필수 항목(title, category) 검증
       if (!title || !category) {
         return res.status(400).json({
           ok: false,
@@ -93,24 +112,19 @@ router.post(
         });
       }
 
-      const created = await prisma.tasteRecord.create({
-        data: {
-          userId,
-          title,
-          desc: caption ?? null, // 프론트 caption → DB desc
-          content: content ?? null,
-          category,
-          tagsJson:
-            tags && Array.isArray(tags) && tags.length > 0
-              ? JSON.stringify(tags)
-              : null,
-          thumb: null,
-        },
+      // 4) 서비스 레이어에 위임하여 레코드 생성
+      const data = await createTasteRecord(userId, {
+        title,
+        caption,
+        content,
+        category,
+        tags,
       });
 
+      // 5) 프론트에서 사용하는 형태로 응답
       res.status(201).json({
         ok: true,
-        data: serialize(created),
+        data,
       });
     } catch (err) {
       next(err);
@@ -118,10 +132,11 @@ router.post(
   }
 );
 
-/**
- * [GET] /api/taste-records
- * 내 취향 기록 목록 조회
- */
+// ============================================================
+// [GET] /api/taste-records
+// ------------------------------------------------------------
+// 내 취향 기록 목록 조회
+// ============================================================
 router.get(
   '/',
   async (req: AuthedRequest, res: Response, next: NextFunction) => {
@@ -135,14 +150,11 @@ router.get(
         });
       }
 
-      const records = await prisma.tasteRecord.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-      });
+      const data = await getTasteRecordsByUser(userId);
 
       res.json({
         ok: true,
-        data: records.map(serialize),
+        data,
       });
     } catch (err) {
       next(err);
@@ -150,10 +162,11 @@ router.get(
   }
 );
 
-/**
- * [GET] /api/taste-records/:id
- * 내 특정 취향 기록 상세 조회
- */
+// ============================================================
+// [GET] /api/taste-records/:id
+// ------------------------------------------------------------
+// 내 특정 취향 기록 상세 조회
+// ============================================================
 router.get(
   '/:id',
   async (req: AuthedRequest, res: Response, next: NextFunction) => {
@@ -176,14 +189,9 @@ router.get(
         });
       }
 
-      const record = await prisma.tasteRecord.findFirst({
-        where: {
-          id,
-          userId, // 내 것만 조회
-        },
-      });
+      const data = await getTasteRecordByIdForUser(userId, id);
 
-      if (!record) {
+      if (!data) {
         return res.status(404).json({
           ok: false,
           error: 'NOT_FOUND',
@@ -193,7 +201,7 @@ router.get(
 
       res.json({
         ok: true,
-        data: serialize(record),
+        data,
       });
     } catch (err) {
       next(err);

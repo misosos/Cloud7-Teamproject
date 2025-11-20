@@ -19,7 +19,7 @@ import Hero from "@/sections/Hero";                    // 상단 대표 배너(�
 import HeaderNav from "@/components/HeaderNav";        // 상단 네비게이션 (여기서는 잠금 모드로 사용)
 import SignupModal from "@/components/SignupModal";    // 로그인/회원가입 통합 모달
 import { useLocation, useNavigate } from "react-router-dom"; // URL 쿼리와 페이지 이동을 위한 라우터 훅
-import { useAuth } from "@/store/auth";
+import { useAuth } from "@/store/authStore";
 
 const DEFAULT_AFTER_LOGIN = "/dashboard";
 

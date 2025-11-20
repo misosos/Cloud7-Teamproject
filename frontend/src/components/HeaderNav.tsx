@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import SignupModal from "@/components/SignupModal";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { useAuth } from "@/store/auth";
+import { useAuth } from "@/store/authStore";
 
 /**
  * 헤더 내비게이션 컴포넌트
