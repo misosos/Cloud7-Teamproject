@@ -1,4 +1,3 @@
-// prisma/schema.prisma
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
@@ -16,4 +15,23 @@ model User {
   role         String?  // 선택
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+  tasteRecords TasteRecord[]
+}
+
+model TasteRecord {
+  id        String   @id @default(cuid())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title     String
+  desc      String?     // 한 줄 설명 (프론트의 caption에 해당)
+  content   String?     // 상세 내용
+  category  String
+  tagsJson  String?     // 태그 배열을 JSON 문자열로 저장 (DB 종류와 상관없이 쓰기 쉽게)
+
+  thumb     String?     // 썸네일 이미지 URL (지금은 안 쓰면 null)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
 }

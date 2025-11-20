@@ -2,16 +2,16 @@
 // - API가 만들어지기 전까지 UI가 정상적으로 보이는지 확인하는 용도
 // - 실 서비스에서는 API 응답으로 대체됨
 
-import type { OfficialDexItem, PersonalChallenge, RecordItem } from "@/types/type";
+import type { OfficialDexItem, PersonalChallenge, TasteRecordItem } from "@/types/type";
 import Placeholder from "@/assets/ui/thumb-placeholder.png";
 
 // ─────────────────────────────────────────────────────────
 // 📝 취향 기록 리스트(Mock Data)
-// - RecordItem 타입을 기반으로 작성됨
+// - TasteRecordItem 타입을 기반으로 작성됨
 // - category 기준으로 정렬/필터링하여 UI에 표시됨
 // - createdAt 은 최신 정렬용 timestamp 값 (ms 단위)
 // ─────────────────────────────────────────────────────────
-export const records: RecordItem[] = [
+export const records: TasteRecordItem[] = [
   { id: "rec-01", title: "라라랜드 감상",           desc: "재즈와 사랑, 선택에 대한 이야기",   thumb: Placeholder, category: "영화",  createdAt: 1730700000000 },
   { id: "rec-02", title: "비 오는 날 R&B 플레이리스트", desc: "로파이·네오소울 중심 10곡",        thumb: Placeholder, category: "음악",  createdAt: 1730710000000 },
   { id: "rec-03", title: "사피엔스 독서 메모",       desc: "인류의 과거에서 현재를 읽다",        thumb: Placeholder, category: "도서",  createdAt: 1730720000000 },

@@ -18,7 +18,6 @@ import useCategory from "@/store/useCategory";
  *
  * 반응형 기준
  *  - 이 컴포넌트는 "모바일 전용"입니다. (Tailwind: lg 이상에서 숨김)
- *    데스크톱에서는 LeftCategorySidebar가 대신 노출됩니다.
  */
 export default function MobileCategoryGrid() {
   // 전역 카테고리 상태의 "변경 함수"만 가져옵니다.

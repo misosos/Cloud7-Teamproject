@@ -1,26 +1,8 @@
-// 기록 카드 컴포넌트: 기록 목록/슬라이더/상세로 이동 시 사용
+// 기록 카드 컴포넌트
 import { Link } from "react-router-dom";
 import type { RecordItem } from "@/types/type";
 import BookFrame from "@/assets/ui/book.png";
 
-/**
- * BookCard (책 모양 기록 카드)
- * ─────────────────────────────────────────────────────────
- * 목적: 한 개의 기록(RecordItem)을 "책" 프레임 안에 썸네일과 함께 보여주는 카드입니다.
- * 사용처: 기록 목록/슬라이더 등에서 아이템을 보여주고, 클릭하면 상세로 이동합니다.
- *
- * ▸ 이 컴포넌트가 받는 데이터(Props)
- *   - item: RecordItem
- *     • item.id    : 상세 페이지 이동에 사용하는 고유 ID (링크 경로에 사용)
- *     • item.title : 카드 하단에 표시되는 제목(캡션)
- *     • item.thumb : 책 안쪽에 들어갈 썸네일 이미지(콘텐츠 미리보기)
- *     • item.desc  : 한 줄 설명(부가 설명)
- *
- * ▸ 디자이너/기획자 참고
- *   - 책 안쪽 썸네일의 위치/크기는 아래 absolute 스타일의 퍼센트 값(top/left/right/bottom)
- *     으로 조정합니다. BookFrame(겉표지) 이미지에 맞춰 수치를 미세 조정 가능합니다.
- *   - 카드 전체 영역이 클릭 가능한 링크입니다. 별도의 버튼 없이도 상세 페이지로 이동합니다.
- */
 export default function BookCard({ item }: { item: RecordItem }) {
   // 카드 전체를 클릭 시 상세페이지로 이동
   return (
