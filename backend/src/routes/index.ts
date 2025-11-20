@@ -13,6 +13,7 @@ import { Router } from 'express';
 //  - health: 서버 살아있음(Health Check) 확인용 엔드포인트
 import auth from './auth.routes';
 import health from './health.routes';
+import tasteRecordsRouter from './tasteRecords.routes'; 
 
 // 1) 비어 있는 라우터(미니 앱)를 하나 생성합니다.
 //    여기에 하위 라우터들을 "장착(mount)"해 하나의 큰 라우터로 합칩니다.

@@ -12,18 +12,18 @@ import { useState } from "react";
  * 화면 동작 요약
  *  1) 상위에서 `open=true`로 열면, 화면 중앙에 모달이 뜹니다.
  *  2) 사용자가 각 입력칸을 채웁니다. (카테고리/태그는 선택형)
- *  3) [저장하기]를 누르면, 현재는 콘솔 출력 + 알림만 띄우고 닫습니다. (※ 실제 저장 API는 나중에 붙입니다)
+ *  3) [저장하기]를 누르면 /taste-records로 POST 요청을 보내어 실제 저장 API를 호출합니다. (저장 성공 시 알림 후 모달을 닫습니다)
  *  4) [취소]를 누르면 모달을 닫습니다. (입력값은 리셋되지 않음: 설계 선택 사항)
  *
  * 데이터가 어디서 오고, 어디로 가나?
  *  - 카테고리/태그 옵션은 상위 컴포넌트에서 props로 내려줍니다.
- *  - 저장하기 버튼은 현재 API를 호출하지 않고, 추후 POST 연동을 위해 자리만 마련해두었습니다.
+ *  - 저장하기 버튼은 /taste-records 엔드포인트로 POST 요청을 보내어 서버에 새 기록을 저장합니다.
  *
  * 접근성(간단히)
  *  - 현재 role/aria 속성은 최소화되어 있습니다. 접근성 향상이 필요하면 aria-*를 추가할 수 있습니다.
  *
  * 확장 포인트 (향후 계획)
- *  - 저장 시 실제 API 연동(POST) 추가, 성공/실패 처리, 로딩/에러 상태 표시
+ *  - 저장 시 추가적인 유효성 검증, 사용자 친화적인 성공/실패 피드백 UI, 로딩/에러 상태 고도화
  *  - 필수값 검증(제목/카테고리 등) 및 입력 길이 제한, 자동 저장(임시 저장)
  *  - 사진/파일 첨부, 리치 텍스트 편집기 등 입력 UI 확장
  */
@@ -45,6 +45,8 @@ export default function TasteRecordModal({
   const [content, setContent] = useState("");        // 상세 내용(메모/설명)
   const [selectedCategory, setSelectedCategory] = useState(""); // 선택된 카테고리(단일)
   const [selectedTags, setSelectedTags] = useState<string[]>([]); // 선택된 태그(다중)
+  const [isSaving, setIsSaving] = useState(false); // 저장 요청 진행 여부
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // 저장 실패 시 에러 메시지
 
   // open=false면 화면에 아무것도 그리지 않음(모달 미노출)
   if (!open) return null;
@@ -122,6 +124,11 @@ export default function TasteRecordModal({
           />
         </div>
 
+        {/* 저장 실패 시 사용자에게 보여줄 에러 메시지 */}
+        {errorMessage && (
+          <p className="mt-4 text-sm text-red-600">{errorMessage}</p>
+        )}
+
         {/* 하단 액션 버튼 영역: 취소/저장 */}
         <div className="mt-6 flex justify-end gap-3">
           {/* 취소: 단순히 모달 닫기 (입력값 유지 여부는 상위 설계에 따름) */}
@@ -134,15 +141,49 @@ export default function TasteRecordModal({
 
           {/* 저장: 현재는 API 없이 콘솔 출력 + 알림 → 모달 닫기 (연동 지점 표시) */}
           <button
-            onClick={() => {
-              // ✅ [연동 포인트] 실제 서비스 연결 시 여기에 POST 요청을 추가하세요.
-              console.log({ title, caption, content, selectedCategory, selectedTags });
-              alert("기록 저장 완료 (API 연결 예정)");
-              onClose();
+            onClick={async () => {
+              // 이미 저장 중이면 중복 요청 방지
+              if (isSaving) return;
+
+              setErrorMessage(null);
+              setIsSaving(true);
+
+              try {
+                const response = await fetch("/taste-records", {
+                  method: "POST",
+                  credentials: "include",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    title,
+                    caption,
+                    content,
+                    category: selectedCategory,
+                    tags: selectedTags,
+                  }),
+                });
+
+                if (!response.ok) {
+                  // 서버에서 에러를 보냈을 때
+                  const errorText = await response.text();
+                  throw new Error(errorText || "저장에 실패했습니다.");
+                }
+
+                // 성공적으로 저장되었을 때
+                alert("기록이 저장되었습니다.");
+                onClose();
+              } catch (error) {
+                console.error("맛 기록 저장 실패", error);
+                setErrorMessage("기록 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+              } finally {
+                setIsSaving(false);
+              }
             }}
-            className="px-4 py-2 text-sm rounded-md bg-amber-600 text-white hover:bg-amber-700"
+            className="px-4 py-2 text-sm rounded-md bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed"
+            disabled={isSaving}
           >
-            저장하기
+            {isSaving ? "저장 중..." : "저장하기"}
           </button>
         </div>
       </div>

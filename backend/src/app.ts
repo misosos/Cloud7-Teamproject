@@ -15,7 +15,7 @@
  *     - `cookie-parser`로 쿠키 읽기
  *     - `cors`로 프론트 도메인에서의 쿠키 포함 요청 허용
  *     - `express-session`으로 세션(쿠키) 복원 및 생성
- *  3) 마지막에 `routes`로 분기되어 `/health`, `/auth` 등 개별 엔드포인트 처리
+ *  3) 마지막에 `/api` 경로로 분기되어 `/api/health`, `/api/auth` 등 개별 엔드포인트를 처리합니다.
  *
  * 환경변수(.env) 가이드
  *  - NODE_ENV            : 'development' | 'production'
@@ -42,6 +42,7 @@ import session from 'express-session'; // 세션(쿠키 기반) 미들웨어
 import helmet from 'helmet'; // 보안 헤더 자동 설정
 import compression from 'compression'; // 응답 압축
 import routes from './routes'; // 라우터 묶음(/health, /auth, ...)
+import tasteRecordsRouter from './routes/tasteRecords.routes'; // 취향 기록 라우터(/api/taste-records)
 import { env } from './utils/env'; // 환경변수 로더/검증 유틸
 
 const app = express(); // ✅ Express 앱 인스턴스 생성
@@ -170,11 +171,17 @@ app.get('/', (_req, res) => {
 
 /**
  * 라우터 묶음
- * - `/health` : 상태 확인(헬스체크)
- * - `/auth`   : 로그인/로그아웃, /auth/me 등 인증 관련
+ * - `/api/health` : 상태 확인(헬스체크)
+ * - `/api/auth`   : 로그인/로그아웃, /auth/me 등 인증 관련
+ * - `/api/taste-records` : 취향 기록 관련 CRUD API
  * - 추후 라우트가 늘어나도 `src/routes`에서만 추가하면 이곳은 그대로 사용 가능
+ *
+ * 👉 모든 API 엔드포인트는 `/api` 프리픽스를 갖도록 통일합니다.
  */
-app.use(routes);
+// 취향 기록 관련 라우터는 /api/taste-records 경로에 직접 연결
+app.use('/api/taste-records', tasteRecordsRouter);
+// 그 외 공통 라우터는 /api 프리픽스로 묶어서 사용
+app.use('/api', routes);
 
 /** 404 핸들러: 정의되지 않은 라우트 */
 app.use((req: Request, res: Response) => {

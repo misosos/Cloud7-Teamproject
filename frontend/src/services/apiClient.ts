@@ -2,16 +2,24 @@
  * API 클라이언트 (fetch 기반)
  * ------------------------------------------------------------------
  * ▸ 세션 쿠키(credentials: 'include'), 타임아웃, 에러 파싱, FormData 업로드 지원
- * ▸ 환경변수 우선순위: VITE_API_BASE_URL → VITE_API_URL → VITE_API_BASE → http://localhost:3000
+ * ▸ 환경변수 우선순위: VITE_API_BASE_URL → VITE_API_URL → VITE_API_BASE → http://localhost:3000 (코드에서 자동으로 /api를 뒤에 붙입니다)
  * ▸ 절대 URL(https://...)과 상대 경로('/auth/me' 또는 'auth/me') 모두 허용
  * ▸ 공통 httpGet/httpPost/httpPut/httpPatch/httpDelete + request(fetch 래퍼) 제공
  */
 
-export const API_BASE: string =
+const RAW_API_BASE: string =
   (import.meta as any).env?.VITE_API_BASE_URL ??
   (import.meta as any).env?.VITE_API_URL ??
   (import.meta as any).env?.VITE_API_BASE ??
   'http://localhost:3000';
+
+// 항상 `/api`로 끝나도록 정규화
+export const API_BASE: string = (() => {
+  // 끝에 붙은 / 제거 (http://localhost:3000/ → http://localhost:3000)
+  const trimmed = RAW_API_BASE.replace(/\/+$/, '');
+  // 이미 /api 로 끝나면 그대로, 아니면 /api 추가
+  return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+})();
 
 const DEFAULT_TIMEOUT =
   Number((import.meta as any).env?.VITE_API_TIMEOUT_MS) || 15000;

@@ -14,17 +14,17 @@
 //  5) TasteRecordModal: 제목/캡션/카테고리/태그/내용을 입력받아 새 기록 작성(현재는 콘솔 출력)
 //
 // 데이터 소스
-//  - records (mock): 더미 데이터로 카드 목록을 만듭니다. 실제 서비스에선 API 연동 예정.
-//  - categoryOptions/tagOptions: 작성 모달에 내려보낼 선택 옵션(더미)
+//  - recordsAll: 서버에서 /taste-records로 조회한 실제 기록 목록
+//  - categoryOptions/tagOptions: 작성 모달에 내려보낼 선택 옵션(더미, 추후 API 연동 가능)
 
 import HeaderNav from "@/components/HeaderNav";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import TasteRecordModal from "@/components/TasteRecordModal";
 import FolderImg from "@/assets/ui/folder.png";
 import BookCard from "@/components/BookCard";
 import type { RecordItem } from "@/types/type";
 // 기록(card) 데이터와 작성 모달용 옵션은 공용 목데이터에서 가져옵니다.
-import { records, categoryOptions, tagOptions } from "@/data/mock";
+import { categoryOptions, tagOptions } from "@/data/mock";
 
 /**
  * SectionTitle: 섹션 제목 + 얇은 구분선
@@ -151,11 +151,47 @@ function AddButton({ onClick, children }: { onClick?: () => void; children: Reac
 /**
  * TasteList: 이 파일의 메인 페이지 컴포넌트
  * - "기록 추가" 버튼 클릭 → 작성 모달(TasteRecordModal) open 상태 관리
- * - records(mock)를 BookCard 슬라이더로 보여줌
+ * - 서버에서 조회한 recordsAll을 BookCard 슬라이더로 보여줌
  */
 export default function TasteList() {
   const [isModalOpen, setIsModalOpen] = useState(false); // 작성 모달 열림 상태
-  const recordsAll: RecordItem[] = records as RecordItem[]; // 더미 데이터(실 서비스에선 API 연동)
+  const [recordsAll, setRecordsAll] = useState<RecordItem[]>([]); // 서버에서 불러온 기록 목록
+  const [isLoading, setIsLoading] = useState(true); // 목록 불러오는 중 여부
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // 오류 메시지 (네트워크/인증 등)
+
+  useEffect(() => {
+    const fetchRecords = async () => {
+      try {
+        setIsLoading(true);
+        setErrorMessage(null);
+  
+        const res = await fetch("/taste-records", {
+          credentials: "include",
+        });
+  
+        if (res.status === 401) {
+          // 로그인 필요
+          setErrorMessage("로그인이 필요한 서비스입니다.");
+          setRecordsAll([]);
+          return;
+        }
+  
+        if (!res.ok) {
+          throw new Error("기록을 불러오는 데 실패했습니다.");
+        }
+  
+        const json = await res.json();
+        setRecordsAll((json.data ?? []) as RecordItem[]);
+      } catch (error) {
+        console.error("취향 기록 목록 조회 실패", error);
+        setErrorMessage("기록을 불러오는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+  
+    fetchRecords();
+  }, []);
 
   return (
     <>
@@ -193,7 +229,17 @@ export default function TasteList() {
             기록
           </SectionTitle>
           <div className="mt-8">
-            <RecordSlider items={recordsAll} />
+            {isLoading ? (
+              <p className="text-sm text-stone-500 text-center">기록을 불러오는 중입니다...</p>
+            ) : errorMessage ? (
+              <p className="text-sm text-red-600 text-center">{errorMessage}</p>
+            ) : recordsAll.length === 0 ? (
+              <p className="text-sm text-stone-500 text-center">
+                아직 저장된 기록이 없습니다. &quot;기록 추가&quot; 버튼을 눌러 첫 기록을 남겨보세요.
+              </p>
+            ) : (
+              <RecordSlider items={recordsAll} />
+            )}
           </div>
         </section>
 
