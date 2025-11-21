@@ -195,8 +195,8 @@ export default function TasteDetail() {
       </header>
 
       <article className="prose prose-stone max-w-none mt-8">
-        {/* 본문 상단에 큰 이미지 표시 (썸네일이 있을 때만) */}
-        {thumbUrl && (
+        {/* 본문 상단에 큰 이미지 표시 (실제 썸네일이 있을 때만) */}
+        {rawThumb && thumbUrl && (
           <figure className="mb-6">
             <img
               src={thumbUrl}
