@@ -3,7 +3,7 @@
 cd frontend
 npm install
 
-# .env 파일 만들기 (.env.example 파일 내용 복붙)
+# 중요!! frontend 폴더 안에서 .env 파일 만들기 (.env.example 파일 내용 복붙)
 
 # 개발 서버 실행
 npm run dev
@@ -24,7 +24,7 @@ npm run dev
 cd backend
 npm install
 
-# .env 파일 만들기 (.env.example 파일 내용 복붙)
+# 중요!! backend 폴더 안에서 .env 파일 만들기 (.env.example 파일 내용 복붙)
 
 # Prisma & DB 클라이언트
 npm i @prisma/client
