@@ -19,14 +19,14 @@
 
 import { useParams, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import type { RecordItem } from "@/types/type";
+import type { TasteRecordItem } from "@/types/type";
 
 export default function TasteDetail() {
   // 1) URL 경로에서 id 파라미터 읽기
   //    예: /취향기록/abc → id = "abc"
   const { id } = useParams<{ id: string }>();
 
-  const [item, setItem] = useState<RecordItem | null>(null); // 조회된 기록 상세
+  const [item, setItem] = useState<TasteRecordItem | null>(null); // 조회된 기록 상세
   const [isLoading, setIsLoading] = useState(true); // 로딩 상태
   const [errorMessage, setErrorMessage] = useState<string | null>(null); // 에러 메시지
   
@@ -59,7 +59,7 @@ export default function TasteDetail() {
         }
   
         const json = await res.json();
-        setItem((json.data ?? null) as RecordItem | null);
+        setItem((json.data ?? null) as TasteRecordItem | null);
       } catch (error) {
         console.error("취향 기록 상세 조회 실패", error);
         setErrorMessage("기록을 불러오는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
