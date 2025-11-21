@@ -5,21 +5,25 @@ import type { TasteRecordItem } from "@/types/type";
  * TasteRecordModal (새 기록 작성 모달)
  * ─────────────────────────────────────────────────────────
  * 목적: 사용자가 "새 기록"을 만들 때 필요한 정보를 입력받는 팝업입니다.
- *      (제목, 짧은 캡션, 카테고리, 태그, 상세 내용)
+ *      (제목, 짧은 캡션, 카테고리, 태그, 상세 내용, 선택 이미지)
  *
  * 누가 읽으면 좋나?
  *  - 기획/디자인/QA 동료: 이 모달이 어떤 역할을 하고 어떤 값들을 다루는지 한눈에 파악할 수 있습니다.
  *
  * 화면 동작 요약
  *  1) 상위에서 `open=true`로 열면, 화면 중앙에 모달이 뜹니다.
- *  2) 사용자가 각 입력칸을 채웁니다. (카테고리/태그는 선택형)
- *  3) [저장하기]를 누르면 /taste-records로 POST 요청을 보내어 실제 저장 API를 호출합니다.
+ *  2) 사용자가 각 입력칸을 채웁니다. (카테고리/태그는 선택형, 사진 첨부는 선택)
+ *  3) [저장하기]를 누르면
+ *      - (선택) 이미지가 있으면 먼저 `/api/uploads/taste-records`로 업로드 후
+ *        업로드된 이미지 URL을 받아옵니다.
+ *      - 이후 `/api/taste-records`로 POST 요청을 보내어 실제 저장 API를 호출합니다.
  *     - ✅ 저장 성공 시: 부모에서 내려준 onSaveSuccess 콜백을 호출해 목록 상태를 갱신할 수 있습니다.
  *  4) [취소]를 누르면 모달을 닫습니다. (입력값은 리셋되지 않음: 설계 선택 사항)
  *
  * 데이터가 어디서 오고, 어디로 가나?
  *  - 카테고리/태그 옵션은 상위 컴포넌트에서 props로 내려줍니다.
- *  - 저장하기 버튼은 /taste-records 엔드포인트로 POST 요청을 보내어 서버에 새 기록을 저장합니다.
+ *  - 저장하기 버튼은 /api/taste-records 엔드포인트로 POST 요청을 보내어 서버에 새 기록을 저장합니다.
+ *  - 이미지가 있을 경우 /api/uploads/taste-records로 먼저 전송하고, 반환된 URL을 thumb 필드로 저장합니다.
  *
  * 접근성(간단히)
  *  - 현재 role/aria 속성은 최소화되어 있습니다. 접근성 향상이 필요하면 aria-*를 추가할 수 있습니다.
@@ -27,15 +31,15 @@ import type { TasteRecordItem } from "@/types/type";
  * 확장 포인트 (향후 계획)
  *  - 저장 시 추가적인 유효성 검증, 사용자 친화적인 성공/실패 피드백 UI, 로딩/에러 상태 고도화
  *  - 필수값 검증(제목/카테고리 등) 및 입력 길이 제한, 자동 저장(임시 저장)
- *  - 사진/파일 첨부, 리치 텍스트 편집기 등 입력 UI 확장
+ *  - 사진/파일 첨부 다중 업로드, 리치 텍스트 편집기 등 입력 UI 확장
  */
 
 // 모달에서 사용할 props 타입 정의
 interface TasteRecordModalProps {
-  open: boolean;              // 모달 열림 여부 (true=열림, false=닫힘)
-  onClose: () => void;        // 모달 닫기 콜백 (상위에서 상태 변경)
-  categoryOptions: string[];  // 드롭다운에 표시할 카테고리 목록
-  tagOptions: string[];       // 체크박스로 표시할 태그 목록
+  open: boolean; // 모달 열림 여부 (true=열림, false=닫힘)
+  onClose: () => void; // 모달 닫기 콜백 (상위에서 상태 변경)
+  categoryOptions: string[]; // 드롭다운에 표시할 카테고리 목록
+  tagOptions: string[]; // 체크박스로 표시할 태그 목록
   /**
    * 저장 성공 시 호출되는 콜백
    * - 백엔드에서 방금 생성된 TasteRecordItem 전체를 내려줍니다.
@@ -43,6 +47,29 @@ interface TasteRecordModalProps {
    */
   onSaveSuccess?: (record: TasteRecordItem) => void;
 }
+
+// 서버 응답 타입(백엔드 tasteRecords.routes.ts의 응답 형태와 맞춤)
+type CreateTasteRecordResponse = {
+  ok: boolean;
+  data: TasteRecordItem;
+  error?: string;
+};
+
+// 이미지 업로드 응답 타입 (upload.routes.ts의 응답 형태에 맞춰 사용)
+type UploadTasteImageResponse = {
+  ok: boolean;
+  /**
+   * 업로드된 이미지 URL
+   * - 백엔드 구현에 따라
+   *   - `url` 필드로 직접 내려줄 수도 있고,
+   *   - `data: { url: string }` 형태로 내려줄 수도 있어서 둘 다 지원합니다.
+   */
+  url?: string;
+  data?: {
+    url?: string;
+  };
+  error?: string;
+};
 
 export default function TasteRecordModal({
   open,
@@ -53,23 +80,38 @@ export default function TasteRecordModal({
 }: TasteRecordModalProps) {
   // ─────────────────────────────────────────────────────────
   // 입력 상태 정의 (사용자가 화면에서 채우는 값들)
-  const [title, setTitle] = useState("");                       // 제목
-  const [caption, setCaption] = useState("");                   // 짧은 캡션(부제)
-  const [content, setContent] = useState("");                   // 상세 내용(메모/설명)
+  const [title, setTitle] = useState(""); // 제목
+  const [caption, setCaption] = useState(""); // 짧은 캡션(부제)
+  const [content, setContent] = useState(""); // 상세 내용(메모/설명)
   const [selectedCategory, setSelectedCategory] = useState(""); // 선택된 카테고리(단일)
   const [selectedTags, setSelectedTags] = useState<string[]>([]); // 선택된 태그(다중)
 
-  const [isSaving, setIsSaving] = useState(false);              // 저장 요청 진행 여부
+  // 이미지 첨부 관련 상태
+  const [imageFile, setImageFile] = useState<File | null>(null); // 사용자가 선택한 실제 이미지 파일
+  const [imagePreview, setImagePreview] = useState<string | null>(null); // 화면에 보여줄 미리보기 URL
+
+  const [isSaving, setIsSaving] = useState(false); // 저장 요청 진행 여부
   const [errorMessage, setErrorMessage] = useState<string | null>(null); // 저장 실패 시 에러 메시지
 
   // open=false면 화면에 아무것도 그리지 않음(모달 미노출)
   if (!open) return null;
 
-  // 서버 응답 타입(백엔드 tasteRecords.routes.ts의 응답 형태와 맞춤)
-  type CreateTasteRecordResponse = {
-    ok: boolean;
-    data: TasteRecordItem;
-    error?: string;
+  // 파일 선택 핸들러 (이미지 첨부)
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) {
+      // 파일이 선택되지 않은 경우 (사용자가 선택 후 취소할 수도 있음)
+      setImageFile(null);
+      setImagePreview(null);
+      return;
+    }
+
+    const file = files[0];
+    setImageFile(file);
+
+    // 간단한 미리보기용 URL 생성 (실제 운영 시 메모리 누수 방지를 위해 revoke 고려)
+    const previewUrl = URL.createObjectURL(file);
+    setImagePreview(previewUrl);
   };
 
   // 저장 버튼 클릭 핸들러
@@ -91,7 +133,39 @@ export default function TasteRecordModal({
     setIsSaving(true);
 
     try {
-      const response = await fetch("/taste-records", {
+      let thumbUrl: string | null = null;
+
+      // 1️⃣ 이미지가 선택된 경우, 먼저 업로드 API 호출
+      if (imageFile) {
+        const formData = new FormData();
+        formData.append("file", imageFile);
+
+        const uploadResponse = await fetch("/api/uploads/taste-records", {
+          method: "POST",
+          credentials: "include", // 세션/쿠키 기반 인증 사용 시
+          body: formData, // multipart/form-data는 브라우저가 자동으로 헤더 생성
+        });
+
+        if (!uploadResponse.ok) {
+          const errorText = await uploadResponse.text();
+          throw new Error(errorText || "이미지 업로드에 실패했습니다.");
+        }
+
+        const uploadJson =
+          (await uploadResponse.json()) as UploadTasteImageResponse;
+
+        // 업로드 응답에서 URL 추출 (top-level `url` 또는 `data.url` 모두 지원)
+        const uploadedUrl = uploadJson.url ?? uploadJson.data?.url;
+
+        if (!uploadJson.ok || !uploadedUrl) {
+          throw new Error(uploadJson.error || "이미지 업로드에 실패했습니다.");
+        }
+
+        thumbUrl = uploadedUrl;
+      }
+
+      // 2️⃣ 실제 취향 기록 저장 API 호출
+      const response = await fetch("/api/taste-records", {
         method: "POST",
         credentials: "include", // 세션/쿠키 기반 인증 사용
         headers: {
@@ -103,6 +177,7 @@ export default function TasteRecordModal({
           content,
           category: selectedCategory,
           tags: selectedTags,
+          thumb: thumbUrl, // 이미지가 없다면 null, 있으면 업로드된 URL
         }),
       });
 
@@ -125,12 +200,14 @@ export default function TasteRecordModal({
         onSaveSuccess(createdRecord);
       }
 
-      // 필요 시 입력값 초기화 (지금은 최소한으로만 정리)
+      // 필요 시 입력값 초기화
       setTitle("");
       setCaption("");
       setContent("");
       setSelectedCategory("");
       setSelectedTags([]);
+      setImageFile(null);
+      setImagePreview(null);
 
       alert("기록이 저장되었습니다.");
       onClose();
@@ -208,6 +285,27 @@ export default function TasteRecordModal({
                 </label>
               ))}
             </div>
+          </div>
+
+          {/* 이미지 첨부: 선택 사항 */}
+          <div>
+            <p className="text-sm text-stone-700 mb-1">사진 첨부 (선택)</p>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleImageChange}
+              className="block w-full text-sm text-stone-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"
+            />
+            {imagePreview && (
+              <div className="mt-3">
+                <p className="text-xs text-stone-500 mb-1">미리보기</p>
+                <img
+                  src={imagePreview}
+                  alt="첨부 이미지 미리보기"
+                  className="w-full h-32 object-cover rounded-md border border-stone-200"
+                />
+              </div>
+            )}
           </div>
 
           {/* 상세 내용: 긴 텍스트 메모/설명 입력 */}

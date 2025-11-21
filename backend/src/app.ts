@@ -60,8 +60,10 @@ import cookieParser from 'cookie-parser'; // 쿠키 파싱
 import session from 'express-session'; // 세션(쿠키 기반) 미들웨어
 import helmet from 'helmet'; // 보안 헤더 자동 설정
 import compression from 'compression'; // 응답 압축
+import path from 'path'; // 파일 시스템 경로 처리(업로드 파일 등)
 import routes from './routes'; // 라우터 묶음(/health, /auth, ...)
 import tasteRecordsRouter from './routes/tasteRecords.routes'; // 취향 기록 라우터(/api/taste-records)
+import uploadRouter from './routes/upload.routes'; // 파일 업로드 라우터(/api/uploads)
 import { env } from './utils/env'; // 환경변수 로더/검증 유틸
 
 /* ==============================================================================
@@ -104,6 +106,14 @@ app.use(compression());
  */
 app.use(express.json({ limit: '1mb' })); // 요청 본문 JSON 최대 1MB
 app.use(express.urlencoded({ extended: true })); // 폼 URL-Encoded 파싱
+
+/**
+ * 업로드 파일 정적 제공
+ * - 업로드된 이미지/파일을 /uploads 및 /api/uploads 경로로 서빙합니다.
+ *   예) 서버에 저장된 파일: /uploads/taste-records/파일명.jpg 또는 /api/uploads/taste-records/파일명.jpg
+ */
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+app.use('/api/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 /** 쿠키 파싱: 서명되지 않은 일반 쿠키를 req.cookies에 매핑 */
 app.use(cookieParser());
@@ -254,10 +264,14 @@ app.get('/', (_req, res) => {
  * - `/api/health`        : 상태 확인(헬스체크)
  * - `/api/auth`          : 로그인/로그아웃, /auth/me 등 인증 관련
  * - `/api/taste-records` : 취향 기록 관련 CRUD API
+ * - `/api/uploads`       : 이미지/파일 업로드 관련 API
  *
  *  모든 API 엔드포인트는 `/api` 프리픽스를 갖도록 통일합니다.
  *  (취향 기록 라우터는 구조상 /api/taste-records에 직접 연결)
  */
+// 파일 업로드 관련 라우터: /api/uploads
+app.use('/api/uploads', uploadRouter);
+
 // 취향 기록 관련 라우터는 /api/taste-records 경로에 직접 연결
 app.use('/api/taste-records', tasteRecordsRouter);
 

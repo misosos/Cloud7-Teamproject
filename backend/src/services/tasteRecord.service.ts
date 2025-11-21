@@ -55,9 +55,10 @@ export async function createTasteRecord(
     content?: string;
     category: string;
     tags?: string[];
+    thumb?: string | null; // ✅ 썸네일 이미지 URL (없을 수 있음)
   }
 ) {
-  const { title, caption, content, category, tags } = payload;
+  const { title, caption, content, category, tags, thumb } = payload;
 
   const created = await prisma.tasteRecord.create({
     data: {
@@ -70,7 +71,7 @@ export async function createTasteRecord(
         tags && Array.isArray(tags) && tags.length > 0
           ? JSON.stringify(tags)
           : null,
-      thumb: null,
+      thumb: thumb ?? null, // ✅ 전달된 썸네일 URL 저장 (없으면 null)
     },
   });
 

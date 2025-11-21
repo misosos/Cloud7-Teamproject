@@ -21,6 +21,58 @@ import { useParams, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import type { TasteRecordItem } from "@/types/type";
 
+// TasteRecordItem 안에서 "이미지 경로" 후보를 추출하는 헬퍼
+// - 백엔드에서 필드명을 바꾸거나, 구조가 약간 달라져도 최대한 유연하게 대응하기 위함입니다.
+function getRawThumbFromItem(item: TasteRecordItem | null): string | null {
+  if (!item) return null;
+
+  const anyItem = item as any;
+
+  // 1순위: 정석적인 thumb 필드
+  // 2~4순위: 혹시라도 다른 이름으로 내려오는 경우까지 함께 고려
+  return (
+    anyItem.thumb ??
+    anyItem.thumbUrl ??
+    anyItem.image ??
+    anyItem.imageUrl ??
+    null
+  );
+}
+
+// 썸네일 URL 정규화: /uploads/... 같은 상대 경로를 실제로 요청 가능한 URL로 변환합니다.
+function resolveThumbUrl(rawThumb?: string | null): string | null {
+  // 썸네일 경로가 없으면 null 반환
+  if (!rawThumb) return null;
+
+  // 이미 http(s) 또는 blob: 으로 시작하는 절대/Blob URL이면 그대로 사용
+  if (
+    rawThumb.startsWith("http://") ||
+    rawThumb.startsWith("https://") ||
+    rawThumb.startsWith("blob:")
+  ) {
+    return rawThumb;
+  }
+
+  // 이미 /api/ 로 시작하는 경우 그대로 사용
+  if (rawThumb.startsWith("/api/")) {
+    return rawThumb;
+  }
+
+  // 백엔드에서 `/uploads/...` 형태로 내려온 경우
+  // 프론트에서는 Vite 프록시(`/api`)를 통해 백엔드 정적 파일에 접근하므로 `/api`를 붙여준다.
+  if (rawThumb.startsWith("/uploads/")) {
+    return `/api${rawThumb}`;
+  }
+
+  // taste-records/파일명 혹은 그냥 파일명으로 내려오는 경우를 대비
+  if (!rawThumb.startsWith("/")) {
+    return `/api/uploads/taste-records/${rawThumb}`;
+  }
+
+  // 그 외의 경우는 일단 `/api` 프리픽스를 붙여서 시도
+  return `/api${rawThumb}`;
+}
+
 export default function TasteDetail() {
   // 1) URL 경로에서 id 파라미터 읽기
   //    예: /취향기록/abc → id = "abc"
@@ -29,6 +81,7 @@ export default function TasteDetail() {
   const [item, setItem] = useState<TasteRecordItem | null>(null); // 조회된 기록 상세
   const [isLoading, setIsLoading] = useState(true); // 로딩 상태
   const [errorMessage, setErrorMessage] = useState<string | null>(null); // 에러 메시지
+  const [thumbLoadError, setThumbLoadError] = useState(false); // 썸네일 이미지 로딩 실패 여부
   
   useEffect(() => {
     if (!id) return;
@@ -38,7 +91,7 @@ export default function TasteDetail() {
         setIsLoading(true);
         setErrorMessage(null);
   
-        const res = await fetch(`/taste-records/${id}`, {
+        const res = await fetch(`/api/taste-records/${id}`, {
           credentials: "include",
         });
   
@@ -92,22 +145,28 @@ export default function TasteDetail() {
           ← 기록 목록으로 돌아가기
         </Link>
       </main>
-    );
+    ); 
   }
 
   // 4) 정상 케이스: 상세 내용 렌더
+  const rawThumb = getRawThumbFromItem(item);
+  // 썸네일이 로딩 에러가 난 경우에는 화면에서 숨기기 위해 null 처리
+  const thumbUrl = !thumbLoadError ? resolveThumbUrl(rawThumb) : null;
+
+  // 디버깅용 로그: 썸네일 원본/정규화 경로를 확인 (개발 중에만 활용)
+  console.debug("[TasteDetail] thumb raw & resolved", { rawThumb, thumbUrl, item });
+
+  // 본문(content) 존재 여부를 사전에 계산해 둡니다.
+  // - hasContent: 실제 텍스트 본문이 있는지 여부
+  const rawContent = (item as any).content;
+  const hasContent =
+    typeof rawContent === "string" || typeof rawContent === "number"
+      ? String(rawContent).trim().length > 0
+      : false;
+
   return (
     <main className="max-w-screen-md mx-auto px-6 py-16">
-      <header className="flex items-start gap-4">
-        {/* 썸네일: 있는 경우에만 렌더 (없으면 공간 낭비를 막기 위해 렌더하지 않음) */}
-        {item.thumb ? (
-          <img
-            src={item.thumb}
-            alt={item.title}
-            className="w-36 h-36 object-cover rounded-md shadow-sm"
-          />
-        ) : null}
-
+      <header className="flex items-start">
         {/* 타이틀/설명 및 메타 정보(카테고리/태그) */}
         <div>
           {/* 제목: 가장 크게 강조 */}
@@ -135,14 +194,30 @@ export default function TasteDetail() {
         </div>
       </header>
 
-      {/* 본문(추후 내용 확장 가능): content가 문자열/숫자일 때만 단순 렌더 */}
-      {"content" in item && item.content ? (
-        <article className="prose prose-stone max-w-none mt-8">
-          {typeof (item as any).content === "string" || typeof (item as any).content === "number"
-            ? (item as any).content
-            : null}
-        </article>
-      ) : null}
+      <article className="prose prose-stone max-w-none mt-8">
+        {/* 본문 상단에 큰 이미지 표시 (썸네일이 있을 때만) */}
+        {thumbUrl && (
+          <figure className="mb-6">
+            <img
+              src={thumbUrl}
+              alt={item.title}
+              className="w-full max-h-96 object-cover rounded-lg shadow-sm"
+              loading="lazy"
+              onError={() => {
+                console.warn("[TasteDetail] 본문 이미지 로딩 실패", { thumbUrl, item });
+                setThumbLoadError(true);
+              }}
+            />
+          </figure>
+        )}
+
+        {/* 텍스트 본문이 있을 때만 렌더링 */}
+        {hasContent && (
+          <p className="whitespace-pre-line">
+            {String((item as any).content)}
+          </p>
+        )}
+      </article>
 
       {/* 하단: 목록으로 되돌아가기 링크 */}
       <footer className="mt-10">

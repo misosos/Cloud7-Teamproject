@@ -94,13 +94,21 @@ router.post(
         });
       }
 
-      // 2) 요청 바디 구조 분해
-      const { title, caption, content, category, tags } = req.body as {
+      // 2) 요청 바디 구조 분해 (썸네일 URL 포함)
+      const {
+        title,
+        caption,
+        content,
+        category,
+        tags,
+        thumb, // ✅ 썸네일 URL (예: `/uploads/taste-records/xxx.jpg`)
+      } = req.body as {
         title?: string;
         caption?: string;
         content?: string;
         category?: string;
         tags?: string[];
+        thumb?: string | null;
       };
 
       // 3) 필수 항목(title, category) 검증
@@ -112,13 +120,14 @@ router.post(
         });
       }
 
-      // 4) 서비스 레이어에 위임하여 레코드 생성
+      // 4) 서비스 레이어에 위임하여 레코드 생성 (thumb 포함)
       const data = await createTasteRecord(userId, {
         title,
         caption,
         content,
         category,
         tags,
+        thumb,
       });
 
       // 5) 프론트에서 사용하는 형태로 응답
