@@ -57,12 +57,16 @@ function SectionTitle({
  * FolderCard: 썸네일 + 제목 + 설명을 세로로 보여주는 소형 카드(그리드용)
  * - item.thumb가 없으면 폴더 아이콘(FolderImg)으로 대체 노출
  * - 현재는 사용하지 않지만(주석 처리된 "컬렉션" 섹션), 디자인 참고용으로 유지
+ *
+ * ※ 현재 컴포넌트 내에서 사용하지 않아 TS/ESLint 경고가 발생하므로
+ *   아래 구현 전체를 주석 처리해 디자인 레퍼런스용으로만 남겨둡니다.
  */
+/*
 function FolderCard({ item }: { item: TasteRecordItem }) {
   return (
     <li className="flex flex-col items-center text-center">
       <div className="w-24 sm:w-28">
-        {/* 장식용 이미지는 alt=""로 스크린리더가 읽지 않도록 처리 */}
+        
         <img
           src={item.thumb ?? FolderImg}
           alt=""
@@ -76,6 +80,7 @@ function FolderCard({ item }: { item: TasteRecordItem }) {
     </li>
   );
 }
+*/
 
 /**
  * RecordSlider: 가로 스크롤 슬라이더(카드들을 좌우로 넘겨봄)

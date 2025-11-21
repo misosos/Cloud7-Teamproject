@@ -55,9 +55,10 @@ export async function createTasteRecord(
     content?: string;
     category: string;
     tags?: string[];
+    thumb?: string | null; // 썸네일 이미지 URL (없을 수 있음)
   }
 ) {
-  const { title, caption, content, category, tags } = payload;
+  const { title, caption, content, category, tags, thumb } = payload;
 
   const created = await prisma.tasteRecord.create({
     data: {
@@ -70,7 +71,7 @@ export async function createTasteRecord(
         tags && Array.isArray(tags) && tags.length > 0
           ? JSON.stringify(tags)
           : null,
-      thumb: null,
+      thumb: thumb ?? null, // 전달된 썸네일 URL 저장 (없으면 null)
     },
   });
 
@@ -113,4 +114,27 @@ export async function getTasteRecordByIdForUser(
   if (!record) return null;
 
   return serialize(record);
+}
+
+// ============================================================
+// [서비스] 사용자별 특정 취향 기록 삭제
+// ------------------------------------------------------------
+// - id + userId 둘 다 조건에 넣어서,
+//   다른 사람 기록을 삭제하는 일이 없도록 방지
+// - 실제로 삭제된 row 수를 기반으로 boolean을 반환합니다.
+//   (라우터에서 deleted === false인 경우 404 등으로 처리할 수 있습니다.)
+// ============================================================
+export async function deleteTasteRecord(
+  userId: number,
+  id: string
+) {
+  const result = await prisma.tasteRecord.deleteMany({
+    where: {
+      id,
+      userId,
+    },
+  });
+
+  // 1개 이상 삭제되었다면 true, 아니면 false 반환
+  return result.count > 0;
 }

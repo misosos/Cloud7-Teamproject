@@ -24,6 +24,11 @@ export default defineConfig({
         // 프론트에서 /taste-records 로 호출하면 백엔드 /api/taste-records 로 전달
         rewrite: (path) => path.replace(/^\/taste-records/, '/api/taste-records'),
       },
+      '/uploads': {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 })
