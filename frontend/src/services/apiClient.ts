@@ -7,6 +7,10 @@
  * ▸ 공통 httpGet/httpPost/httpPut/httpPatch/httpDelete + request(fetch 래퍼) 제공
  */
 
+// --------------------------------------------------------------
+// API 기본 URL 설정
+//  - 환경변수에서 기본 주소를 읽고 항상 "/api"로 끝나도록 정규화
+// --------------------------------------------------------------
 const RAW_API_BASE: string =
   (import.meta as any).env?.VITE_API_BASE_URL ??
   (import.meta as any).env?.VITE_API_URL ??
@@ -20,6 +24,11 @@ export const API_BASE: string = (() => {
   // 이미 /api 로 끝나면 그대로, 아니면 /api 추가
   return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
 })();
+
+// API_ORIGIN: 이미지와 같은 정적 리소스를 요청할 때 사용할 기본 Origin URL
+//  - 예: API_BASE가 "http://localhost:3000/api"라면
+//        API_ORIGIN은 "http://localhost:3000"이 됩니다.
+export const API_ORIGIN: string = API_BASE.replace(/\/api$/, '');
 
 const DEFAULT_TIMEOUT =
   Number((import.meta as any).env?.VITE_API_TIMEOUT_MS) || 15000;

@@ -17,8 +17,9 @@
 //  - 썸네일 <img>에는 alt를 지정하여 스크린리더 사용자가 내용을 이해할 수 있도록 합니다.
 //  - 태그는 작은 배지 형태로 반복 렌더링합니다.
 
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import apiClient from "@/services/apiClient";
 import type { TasteRecordItem } from "@/types/type";
 
 // TasteRecordItem 안에서 "이미지 경로" 후보를 추출하는 헬퍼
@@ -77,12 +78,34 @@ export default function TasteDetail() {
   // 1) URL 경로에서 id 파라미터 읽기
   //    예: /취향기록/abc → id = "abc"
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
 
   const [item, setItem] = useState<TasteRecordItem | null>(null); // 조회된 기록 상세
   const [isLoading, setIsLoading] = useState(true); // 로딩 상태
   const [errorMessage, setErrorMessage] = useState<string | null>(null); // 에러 메시지
   const [thumbLoadError, setThumbLoadError] = useState(false); // 썸네일 이미지 로딩 실패 여부
-  
+
+  // 선택한 기록을 삭제하는 핸들러
+  const handleDelete = async () => {
+    // 아직 상세 데이터가 없는 상태라면 아무 작업도 하지 않음
+    if (!item) return;
+
+    const confirmed = window.confirm("정말 이 기록을 삭제하시겠습니까?");
+    if (!confirmed) return;
+
+    try {
+      // 백엔드 DELETE /api/taste-records/:id 호출
+      // apiClient는 기본 경로로 /api를 사용하므로 여기서는 /taste-records만 적어줍니다.
+      await apiClient.delete(`/taste-records/${item.id}`);
+
+      // 삭제 성공 시 취향 기록 목록 화면으로 이동
+      navigate("/취향기록", { replace: true });
+    } catch (error) {
+      console.error("[TasteDetail] 삭제 실패", error);
+      alert("삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+    }
+  };
+
   useEffect(() => {
     if (!id) return;
   
@@ -219,11 +242,19 @@ export default function TasteDetail() {
         )}
       </article>
 
-      {/* 하단: 목록으로 되돌아가기 링크 */}
-      <footer className="mt-10">
+      {/* 하단: 목록으로 되돌아가기 & 삭제 버튼 */}
+      <footer className="mt-10 flex items-center justify-between gap-3">
         <Link to="/취향기록" className="text-amber-800 underline">
           ← 기록 목록으로 돌아가기
         </Link>
+
+        <button
+          type="button"
+          onClick={handleDelete}
+          className="rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
+        >
+          기록 삭제
+        </button>
       </footer>
     </main>
   );
