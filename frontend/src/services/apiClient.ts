@@ -52,14 +52,17 @@ export type RequestOptions = {
   withCredentials?: boolean; // 기본 true
 };
 
+// 주어진 path가 'http://' 또는 'https://'로 시작하는 절대 URL인지 여부를 판단
 const isAbsolute = (p: string) => /^https?:\/\//i.test(p);
+// 값이 FormData 인스턴스인지 확인 (파일 업로드 여부 체크용)
 const isFormData = (v: any): v is FormData =>
   typeof FormData !== 'undefined' && v instanceof FormData;
+// 일반 객체(순수 JSON 객체)인지 여부 판별
 const isPlainObject = (v: any) =>
   Object.prototype.toString.call(v) === '[object Object]';
 
-// 객체 → ?a=1&b=2 형태로 변환
-function qs(params?: Record<string, any>): string {
+// 객체 형태의 params를 '?a=1&b=2' 형식의 쿼리스트링으로 변환
+export function qs(params?: Record<string, any>): string {
   if (!params) return '';
   const s = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
@@ -71,8 +74,8 @@ function qs(params?: Record<string, any>): string {
   return str ? `?${str}` : '';
 }
 
-// URL builder: path + params → full URL
-function buildUrl(path: string, params?: Record<string, any>): string {
+// path와 쿼리 파라미터를 합쳐 최종 호출 URL을 생성하는 헬퍼
+export function buildUrl(path: string, params?: Record<string, any>): string {
   // 절대 URL이면 그대로 사용
   const base = isAbsolute(path) ? '' : API_BASE;
 
@@ -99,11 +102,7 @@ function buildUrl(path: string, params?: Record<string, any>): string {
 }
 
 /**
- * 내부 공통 요청 함수
- * - credentials: 'include' 로 httpOnly 쿠키(세션) 자동 전송 (옵션으로 해제 가능)
- * - AbortController 로 타임아웃 구현 (기본 15초, VITE_API_TIMEOUT_MS로 오버라이드 가능)
- * - JSON 에러 응답 시 {message|error|msg|code} 우선 사용
- * - FormData 업로드 시 Content-Type 자동 처리
+ * 공통 fetch 래퍼: 타임아웃, 쿠키 전송, 에러 파싱, JSON/텍스트 응답 처리
  */
 export async function request<T>(
   method: HttpMethod,
@@ -192,31 +191,35 @@ export async function request<T>(
   return payload as T;
 }
 
-// 공개 유틸: GET/POST/PUT/PATCH/DELETE
+// GET 요청 전용 헬퍼
 export const httpGet = <T>(
   path: string,
   params?: Record<string, any>,
   opt?: Omit<RequestOptions, 'params' | 'data'>
 ) => request<T>('GET', path, { ...(opt || {}), params });
 
+// POST 요청 전용 헬퍼
 export const httpPost = <T>(
   path: string,
   data?: any,
   opt?: Omit<RequestOptions, 'data'>
 ) => request<T>('POST', path, { ...(opt || {}), data });
 
+// PUT 요청 전용 헬퍼
 export const httpPut = <T>(
   path: string,
   data?: any,
   opt?: Omit<RequestOptions, 'data'>
 ) => request<T>('PUT', path, { ...(opt || {}), data });
 
+// PATCH 요청 전용 헬퍼
 export const httpPatch = <T>(
   path: string,
   data?: any,
   opt?: Omit<RequestOptions, 'data'>
 ) => request<T>('PATCH', path, { ...(opt || {}), data });
 
+// DELETE 요청 전용 헬퍼 (주로 쿼리 파라미터 기반)
 export const httpDelete = <T>(
   path: string,
   params?: Record<string, any>,

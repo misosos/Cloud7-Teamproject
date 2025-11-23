@@ -150,3 +150,97 @@ export async function deleteTasteRecord(
   // 1개 이상 삭제되었다면 true, 아니면 false 반환
   return result.count > 0;
 }
+
+// ============================================================
+// [타입] 취향 인사이트 구조
+// ------------------------------------------------------------
+// - byCategory: 카테고리별 기록 개수
+// - byTag     : 태그별 기록 개수
+// - byMonth   : 연-월(YYYY-MM) 기준 기록 개수
+// - recentRecords: 최근 기록 10개 (카드용)
+// ============================================================
+export type TasteRecordDTO = ReturnType<typeof serialize>;
+
+export interface TasteRecordInsights {
+  byCategory: { category: string; count: number }[];
+  byTag: { tag: string; count: number }[];
+  byMonth: { month: string; count: number }[];
+  recentRecords: TasteRecordDTO[];
+}
+
+// ============================================================
+// [서비스] 취향 인사이트 조회
+// ------------------------------------------------------------
+// - 한 번에 사용자 전체 기록을 가져와 메모리에서 집계
+// - 규모가 커지면 groupBy / rawQuery 등으로 최적화 가능
+// - 여기서는 대시보드용 기본 통계를 제공
+// ============================================================
+export async function getTasteRecordInsightsByUser(
+  userId: number
+): Promise<TasteRecordInsights> {
+  // 1) 해당 사용자의 모든 기록 조회
+  const records = await prisma.tasteRecord.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const serialized = records.map(serialize);
+
+  // 2) 집계용 맵 준비
+  const categoryMap = new Map<string, number>();
+  const tagMap = new Map<string, number>();
+  const monthMap = new Map<string, number>();
+
+  for (const record of serialized) {
+    // 2-1) 카테고리별 카운트
+    categoryMap.set(
+      record.category,
+      (categoryMap.get(record.category) ?? 0) + 1
+    );
+
+    // 2-2) 태그별 카운트
+    if (record.tags && record.tags.length > 0) {
+      for (const tag of record.tags) {
+        tagMap.set(tag, (tagMap.get(tag) ?? 0) + 1);
+      }
+    }
+
+    // 2-3) 연-월(YYYY-MM) 기준 카운트
+    const baseDate = record.recordDate ?? record.createdAt;
+    const d = new Date(baseDate);
+
+    if (!Number.isNaN(d.getTime())) {
+      const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+        2,
+        '0'
+      )}`;
+      monthMap.set(monthKey, (monthMap.get(monthKey) ?? 0) + 1);
+    }
+  }
+
+  // 3) 맵 → 정렬된 배열로 변환
+  const byCategory = Array.from(categoryMap.entries())
+    .map(([category, count]) => ({ category, count }))
+    .sort((a, b) => b.count - a.count); // 많이 기록된 순으로 정렬
+
+  const byTag = Array.from(tagMap.entries())
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count); // 많이 사용된 태그 순으로 정렬
+
+  const byMonth = Array.from(monthMap.entries())
+    .map(([month, count]) => ({ month, count }))
+    .sort((a, b) => a.month.localeCompare(b.month)); // 오래된 달 → 최근 달 순
+
+  // 4) 최근 기록 10개 (recordDate 기준 내림차순)
+  const recentRecords = serialized
+    .slice()
+    .sort((a, b) => b.recordDate.localeCompare(a.recordDate))
+    .slice(0, 10);
+
+  return {
+    byCategory,
+    byTag,
+    byMonth,
+    recentRecords,
+  };
+}
