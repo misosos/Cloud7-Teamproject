@@ -14,7 +14,7 @@
  *
  * ▸ 화면 구성(위에서 아래로)
  *   1) HeaderNav: 상단 고정 네비게이션(로그인 상태/메뉴/CTA)
- *   2) Hero: 상단 대표 섹션(배너)
+ *   2) TasteInsights: 상단 인사이트 요약 섹션(취향 통계/패턴 카드)
  *   3) MobileCategoryGrid: 모바일에서만 보이는 4x2 카테고리 선택 그리드
  *   4) Main(12컬럼 그리드):
  *      - 좌측 사이드바(데스크톱 전용)
@@ -37,9 +37,9 @@
 import HeaderNav from "@/components/HeaderNav";
 import LeftCategorySidebar from "@/components/LeftCategorySidebar";
 import RightCategorySidebar from "@/components/RightCategorySidebar";
-import Hero from "@/sections/Hero";
-import RecordGallery from "@/sections/RecordGallery";
+import RecordGallery from "@/pages/Dashboard/RecordGallery";
 import MobileCategoryGrid from "@/components/MobileCategoryGrid";
+import TasteInsights from "@/pages/Dashboard/TasteInsights";
 
 export default function Dashboard() {
   return (
@@ -61,15 +61,12 @@ export default function Dashboard() {
       <HeaderNav authButtons="full" />
 
       {/**
-       * 2) 히어로(대표 배너)
-       *  - 풀-블리드로 화면 전체 폭을 사용합니다.
-       *    · w-screen : 화면 전체 너비
-       *    · left-1/2 + -ml-[50vw] : 현재 컨테이너의 중앙을 기준으로 왼쪽으로 화면의 절반만큼 당겨서
-       *      좌측 끝을 화면의 좌측 끝과 맞춥니다. 오른쪽도 같은 방식(-mr-[50vw]).
-       *  - 위/아래 여백은 반응형으로 조금씩 증가합니다.
+       * 2) 취향 인사이트 요약 섹션
+       *  - 로그인한 사용자의 전체 취향 패턴을 한눈에 보여주는 카드형 대시보드입니다.
+       *  - 상단에 배치하여 "최근 나는 어떤 취향을 많이 기록했는지"를 먼저 확인할 수 있게 합니다.
        */}
-      <section className="relative w-screen left-1/2 right-1/2 -ml-[50vw] -mr-[50vw] mt-6 md:mt-8 mb-8 md:mb-12 lg:mb-16">
-        <Hero />
+      <section className="mx-auto max-w-[1160px] px-4 sm:px-6 mt-6 md:mt-8 mb-8 md:mb-12 lg:mb-16">
+        <TasteInsights />
       </section>
 
       {/**
@@ -117,6 +114,7 @@ export default function Dashboard() {
           <RightCategorySidebar />
         </div>
       </main>
+
 
       {/**
        * 5) 푸터(하단 정보)

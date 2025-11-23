@@ -2,12 +2,13 @@
 // ============================================================
 // 취향 기록(TasteRecord) API 라우터
 // ------------------------------------------------------------
-// 이 라우터는 "취향 기록" CRUD 중 일부를 담당합니다.
+// 이 라우터는 "취향 기록" CRUD + 인사이트 일부를 담당합니다.
 //
-//   - [POST] /api/taste-records      : 취향 기록 생성
-//   - [GET]  /api/taste-records      : 내 취향 기록 목록 조회
-//   - [GET]  /api/taste-records/:id  : 내 특정 취향 기록 상세 조회
-//   - [DELETE] /api/taste-records/:id: 내 특정 취향 기록 삭제
+//   - [POST]    /api/taste-records          : 취향 기록 생성
+//   - [GET]     /api/taste-records          : 내 취향 기록 목록 조회
+//   - [GET]     /api/taste-records/insights : 내 취향 인사이트/통계 조회
+//   - [GET]     /api/taste-records/:id      : 내 특정 취향 기록 상세 조회
+//   - [DELETE]  /api/taste-records/:id      : 내 특정 취향 기록 삭제
 //
 // app.ts / routes/index.ts 에서:
 //   app.use('/api', routes);
@@ -23,6 +24,8 @@ import {
   getTasteRecordsByUser,
   getTasteRecordByIdForUser,
   deleteTasteRecord,
+  // ✅ 인사이트용 서비스 함수 (tasteRecord.service.ts 에 구현 예정)
+  getTasteRecordInsightsByUser,
 } from '../services/tasteRecord.service';
 
 // ============================================================
@@ -186,7 +189,8 @@ router.post(
 // [GET] /api/taste-records
 // ------------------------------------------------------------
 // 내 취향 기록 목록 조회
-//  - 서비스 레이어에서 visitedAt까지 포함해 반환한다고 가정
+//  - 서비스 레이어에서 recordDate(또는 visitedAt 역할)까지
+//    포함해 반환한다고 가정
 // ============================================================
 router.get(
   '/',
@@ -210,10 +214,67 @@ router.get(
 );
 
 // ============================================================
+// [GET] /api/taste-records/insights
+// ------------------------------------------------------------
+// 내 취향 인사이트/통계 조회
+//
+// 예시: (서비스 레이어에서 실제 구조 정의)
+// {
+//   totalCount: number;                         // 전체 기록 수
+//   byCategory: { [category: string]: number };// 카테고리별 개수
+//   topTags: { tag: string; count: number }[]; // 인기 태그 Top N
+//   timeline: { date: string; count: number }[];// 날짜별 기록 수
+// }
+//
+// 쿼리 파라미터로 기간 필터를 받을 수 있게 설계:
+//   GET /api/taste-records/insights?from=2025-01-01&to=2025-01-31
+// ============================================================
+router.get(
+  '/insights',
+  async (req: AuthedRequest, res: Response, next: NextFunction) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) {
+        return sendUnauthorized(res);
+      }
+
+      const { from, to } = req.query as { from?: string; to?: string };
+
+      let fromDate: Date | undefined;
+      let toDate: Date | undefined;
+
+      if (from) {
+        const d = new Date(from);
+        if (!Number.isNaN(d.getTime())) {
+          fromDate = d;
+        }
+      }
+
+      if (to) {
+        const d = new Date(to);
+        if (!Number.isNaN(d.getTime())) {
+          toDate = d;
+        }
+      }
+
+      // 서비스 레이어에 인사이트 집계 위임
+      const data = await getTasteRecordInsightsByUser(userId);
+
+      return res.json({
+        ok: true,
+        data,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ============================================================
 // [GET] /api/taste-records/:id
 // ------------------------------------------------------------
 // 내 특정 취향 기록 상세 조회
-//  - 서비스 레이어에서 visitedAt 필드까지 포함해서 반환한다고 가정
+//  - 서비스 레이어에서 recordDate(방문일) 필드까지 포함해서 반환한다고 가정
 // ============================================================
 router.get(
   '/:id',

@@ -20,7 +20,7 @@
  */
 import React, { Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Dashboard from "@/pages/AfterLogin/Dashboard"; // 로그인 후 메인 화면
+import Dashboard from "@/pages/Dashboard/Dashboard"; // 로그인 후 메인 화면
 import TasteList from "@/pages/TasteRecord/TasteList"; // 기록 목록(보호 라우트 내부)
 import TasteDetail from "@/pages/TasteRecord/TasteDetail"; // 기록 상세(보호 라우트 내부)
 import BeforeLogin from "@/pages/BeforeLogin/BeforeLogin"; // 로그인 전 랜딩 페이지
