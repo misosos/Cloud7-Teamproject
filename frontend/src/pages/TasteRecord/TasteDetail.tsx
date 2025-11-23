@@ -187,6 +187,28 @@ export default function TasteDetail() {
       ? String(rawContent).trim().length > 0
       : false;
 
+  // 기록 날짜(또는 방문 날짜) 표시용 텍스트
+  // - 기본적으로 recordedAt(또는 recordDate)가 있으면 그 값을 사용
+  // - 없을 경우 createdAt을 fallback으로 사용
+  let displayDate: string | null = null;
+  const rawDateValue =
+    (item as any).recordedAt ??
+    (item as any).recordDate ??
+    (item as any).visitedAt ??
+    (item as any).createdAt;
+
+  if (rawDateValue) {
+    const dateObj = new Date(rawDateValue);
+    if (!Number.isNaN(dateObj.getTime())) {
+      // 한국 기준 yyyy. MM. dd 형태로 포맷팅
+      displayDate = dateObj.toLocaleDateString("ko-KR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+    }
+  }
+
   return (
     <main className="max-w-screen-md mx-auto px-6 py-16">
       <header className="flex items-start">
@@ -201,6 +223,13 @@ export default function TasteDetail() {
           {"category" in item && item.category ? (
             <p className="mt-2 text-sm text-stone-500">카테고리: {item.category}</p>
           ) : null}
+
+          {displayDate && (
+            <p className="mt-1 text-sm text-stone-500">
+              {/* recordedAt / recordDate / visitedAt 중 사용 가능한 값을 날짜로 표시 */}
+              기록 날짜: {displayDate}
+            </p>
+          )}
 
           {"tags" in item && Array.isArray(item.tags) && item.tags.length ? (
             <div className="mt-2 flex flex-wrap gap-1.5">

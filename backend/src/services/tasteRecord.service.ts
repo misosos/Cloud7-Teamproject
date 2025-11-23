@@ -36,6 +36,10 @@ function serialize(record: any) {
     category: record.category,
     tags: record.tagsJson ? (JSON.parse(record.tagsJson) as string[]) : [],
     thumb: record.thumb ?? null,
+    // 사용자가 기록한 날짜(없으면 createdAt 기반)
+    recordDate: record.recordedAt
+      ? record.recordedAt.toISOString()
+      : record.createdAt.toISOString(),
     createdAt: record.createdAt.toISOString(),
   };
 }
@@ -56,9 +60,10 @@ export async function createTasteRecord(
     category: string;
     tags?: string[];
     thumb?: string | null; // 썸네일 이미지 URL (없을 수 있음)
+    recordDate?: string | Date; // 사용자가 선택한 기록 날짜(선택)
   }
 ) {
-  const { title, caption, content, category, tags, thumb } = payload;
+  const { title, caption, content, category, tags, thumb, recordDate } = payload;
 
   const created = await prisma.tasteRecord.create({
     data: {
@@ -71,6 +76,13 @@ export async function createTasteRecord(
         tags && Array.isArray(tags) && tags.length > 0
           ? JSON.stringify(tags)
           : null,
+      // Prisma의 필드명은 recordedAt 이므로 여기서 매핑해줌
+      recordedAt:
+        recordDate
+          ? recordDate instanceof Date
+            ? recordDate
+            : new Date(recordDate)
+          : undefined,
       thumb: thumb ?? null, // 전달된 썸네일 URL 저장 (없으면 null)
     },
   });
