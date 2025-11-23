@@ -85,6 +85,13 @@ export default function TasteRecordModal({
   const [content, setContent] = useState(""); // 상세 내용(메모/설명)
   const [selectedCategory, setSelectedCategory] = useState(""); // 선택된 카테고리(단일)
   const [selectedTags, setSelectedTags] = useState<string[]>([]); // 선택된 태그(다중)
+  /**
+   * 기록 날짜 (YYYY-MM-DD)
+   * - 사용자가 '언제의 기록인지' 직접 선택할 수 있는 날짜 값
+   * - HTML input[type="date"]와 바인딩됩니다.
+   * - 백엔드에는 문자열(예: "2025-11-23")로 전달되고, 서비스 레이어에서 Date로 변환해 저장합니다.
+   */
+  const [recordDate, setRecordDate] = useState<string>(""); // 기록 날짜
 
   // 이미지 첨부 관련 상태
   const [imageFile, setImageFile] = useState<File | null>(null); // 사용자가 선택한 실제 이미지 파일
@@ -178,6 +185,14 @@ export default function TasteRecordModal({
           category: selectedCategory,
           tags: selectedTags,
           thumb: thumbUrl, // 이미지가 없다면 null, 있으면 업로드된 URL
+          /**
+           * 기록 날짜
+           * - 프론트에서는 문자열(YYYY-MM-DD)로 전달
+           * - 백엔드에서는 선택적으로 Date로 변환해 저장
+           * - 사용자가 날짜를 선택하지 않으면 빈 문자열("")이므로,
+           *   서비스에서 적절히 기본값(now) 처리하거나 null로 저장하도록 설계할 수 있습니다.
+           */
+          date: recordDate || null,
         }),
       });
 
@@ -263,6 +278,20 @@ export default function TasteRecordModal({
               </option>
             ))}
           </select>
+
+          {/* 기록 날짜 선택: 이 경험이 실제로 있었던 날짜 */}
+          <div>
+            <p className="text-sm text-stone-700 mb-1">기록 날짜 선택 (선택)</p>
+            <input
+              type="date"
+              value={recordDate}
+              onChange={(e) => setRecordDate(e.target.value)}
+              className="w-full border border-stone-300 rounded-md px-3 py-2"
+            />
+            <p className="mt-1 text-xs text-stone-500">
+              실제로 이 경험을 했던 날짜가 있다면 선택해주세요. 비워두면 기본값으로 저장될 수 있습니다.
+            </p>
+          </div>
 
           {/* 태그 선택: 여러 개를 동시에 선택할 수 있는 체크박스 그룹 */}
           <div>

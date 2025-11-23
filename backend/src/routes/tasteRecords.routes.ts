@@ -7,6 +7,7 @@
 //   - [POST] /api/taste-records      : 취향 기록 생성
 //   - [GET]  /api/taste-records      : 내 취향 기록 목록 조회
 //   - [GET]  /api/taste-records/:id  : 내 특정 취향 기록 상세 조회
+//   - [DELETE] /api/taste-records/:id: 내 특정 취향 기록 삭제
 //
 // app.ts / routes/index.ts 에서:
 //   app.use('/api', routes);
@@ -15,7 +16,7 @@
 // 와 같은 식으로 마운트된다고 가정합니다.
 // ============================================================
 
-import { Router, Request, Response, NextFunction } from 'express';
+import { Router, type Request, type Response, type NextFunction } from 'express';
 import authRequired from '../middlewares/authRequired';
 import {
   createTasteRecord,
@@ -31,7 +32,28 @@ import {
 //   (req.currentUser = req.session.user 형태)
 // ============================================================
 type AuthedRequest = Request & {
-  currentUser?: { id: string; email?: string };
+  currentUser?: {
+    id: string;
+    email?: string;
+  };
+};
+
+// ============================================================
+// 요청 바디 타입: CreateTasteRecordBody
+// ------------------------------------------------------------
+// 취향 기록 생성 시 들어오는 바디를 타입으로 정리해서
+// 아래 POST 핸들러에서 재사용합니다.
+// ============================================================
+type CreateTasteRecordBody = {
+  title?: string;
+  caption?: string;
+  content?: string;
+  category?: string;
+  tags?: string[];
+  // 썸네일 URL (예: `/uploads/taste-records/xxx.jpg`)
+  thumb?: string | null;
+  // 프론트에서 YYYY-MM-DD 또는 ISO 문자열로 보내준다고 가정
+  visitedAt?: string | null;
 };
 
 // ============================================================
@@ -67,6 +89,24 @@ function getUserId(req: AuthedRequest): number | null {
 
 const router = Router();
 
+// 공통 Unauthorized 응답 헬퍼
+const sendUnauthorized = (res: Response) => {
+  return res.status(401).json({
+    ok: false,
+    error: 'UNAUTHORIZED',
+    message: '로그인이 필요합니다.',
+  });
+};
+
+// 공통 BadRequest 응답 헬퍼
+const sendBadRequest = (res: Response, message: string) => {
+  return res.status(400).json({
+    ok: false,
+    error: 'BAD_REQUEST',
+    message,
+  });
+};
+
 // ============================================================
 // 전역 인증 보호
 // ------------------------------------------------------------
@@ -80,6 +120,8 @@ router.use(authRequired);
 // [POST] /api/taste-records
 // ------------------------------------------------------------
 // 취향 기록 생성
+//  - visitedAt: 사용자가 실제로 경험한 날짜(선택 사항)
+//  - thumb    : 업로드된 썸네일 이미지 URL(선택 사항)
 // ============================================================
 router.post(
   '/',
@@ -88,40 +130,36 @@ router.post(
       // 1) 로그인된 사용자 ID 추출
       const userId = getUserId(req);
       if (!userId) {
-        return res.status(401).json({
-          ok: false,
-          error: 'UNAUTHORIZED',
-          message: '로그인이 필요합니다.',
-        });
+        return sendUnauthorized(res);
       }
 
-      // 2) 요청 바디 구조 분해 (썸네일 URL 포함)
+      // 2) 요청 바디 구조 분해
       const {
         title,
         caption,
         content,
         category,
         tags,
-        thumb, // ✅ 썸네일 URL (예: `/uploads/taste-records/xxx.jpg`)
-      } = req.body as {
-        title?: string;
-        caption?: string;
-        content?: string;
-        category?: string;
-        tags?: string[];
-        thumb?: string | null;
-      };
+        thumb,      // ✅ 썸네일 URL (예: `/uploads/taste-records/xxx.jpg`)
+        visitedAt,  // ✅ 사용자가 선택한 날짜(문자열, 선택 사항)
+      } = req.body as CreateTasteRecordBody;
 
       // 3) 필수 항목(title, category) 검증
       if (!title || !category) {
-        return res.status(400).json({
-          ok: false,
-          error: 'BAD_REQUEST',
-          message: 'title과 category는 필수입니다.',
-        });
+        return sendBadRequest(res, 'title과 category는 필수입니다.');
       }
 
-      // 4) 서비스 레이어에 위임하여 레코드 생성 (thumb 포함)
+      // 4) 날짜 문자열을 Date 객체로 변환 (옵션 필드)
+      //  - 값이 없거나, 잘못된 형식이면 DB에 넣지 않도록 null 처리
+      let visitedAtDate: Date | null = null;
+      if (visitedAt) {
+        const parsed = new Date(visitedAt);
+        if (!Number.isNaN(parsed.getTime())) {
+          visitedAtDate = parsed;
+        }
+      }
+
+      // 5) 서비스 레이어에 위임하여 레코드 생성 (thumb + visitedAt 포함)
       const data = await createTasteRecord(userId, {
         title,
         caption,
@@ -129,10 +167,12 @@ router.post(
         category,
         tags,
         thumb,
+        // Prisma 스키마에 `recordDate DateTime?` 필드가 있다고 가정
+        recordDate: visitedAtDate ?? undefined,
       });
 
-      // 5) 프론트에서 사용하는 형태로 응답
-      res.status(201).json({
+      // 6) 프론트에서 사용하는 형태로 응답
+      return res.status(201).json({
         ok: true,
         data,
       });
@@ -146,6 +186,7 @@ router.post(
 // [GET] /api/taste-records
 // ------------------------------------------------------------
 // 내 취향 기록 목록 조회
+//  - 서비스 레이어에서 visitedAt까지 포함해 반환한다고 가정
 // ============================================================
 router.get(
   '/',
@@ -153,16 +194,12 @@ router.get(
     try {
       const userId = getUserId(req);
       if (!userId) {
-        return res.status(401).json({
-          ok: false,
-          error: 'UNAUTHORIZED',
-          message: '로그인이 필요합니다.',
-        });
+        return sendUnauthorized(res);
       }
 
       const data = await getTasteRecordsByUser(userId);
 
-      res.json({
+      return res.json({
         ok: true,
         data,
       });
@@ -176,6 +213,7 @@ router.get(
 // [GET] /api/taste-records/:id
 // ------------------------------------------------------------
 // 내 특정 취향 기록 상세 조회
+//  - 서비스 레이어에서 visitedAt 필드까지 포함해서 반환한다고 가정
 // ============================================================
 router.get(
   '/:id',
@@ -183,20 +221,12 @@ router.get(
     try {
       const userId = getUserId(req);
       if (!userId) {
-        return res.status(401).json({
-          ok: false,
-          error: 'UNAUTHORIZED',
-          message: '로그인이 필요합니다.',
-        });
+        return sendUnauthorized(res);
       }
 
       const { id } = req.params;
       if (!id) {
-        return res.status(400).json({
-          ok: false,
-          error: 'BAD_REQUEST',
-          message: 'id 파라미터가 필요합니다.',
-        });
+        return sendBadRequest(res, 'id 파라미터가 필요합니다.');
       }
 
       const data = await getTasteRecordByIdForUser(userId, id);
@@ -209,7 +239,7 @@ router.get(
         });
       }
 
-      res.json({
+      return res.json({
         ok: true,
         data,
       });
@@ -231,20 +261,12 @@ router.delete(
     try {
       const userId = getUserId(req);
       if (!userId) {
-        return res.status(401).json({
-          ok: false,
-          error: 'UNAUTHORIZED',
-          message: '로그인이 필요합니다.',
-        });
+        return sendUnauthorized(res);
       }
 
       const { id } = req.params;
       if (!id) {
-        return res.status(400).json({
-          ok: false,
-          error: 'BAD_REQUEST',
-          message: 'id 파라미터가 필요합니다.',
-        });
+        return sendBadRequest(res, 'id 파라미터가 필요합니다.');
       }
 
       // 서비스 레이어에 삭제 위임 (boolean 반환)

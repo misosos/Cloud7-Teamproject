@@ -38,8 +38,6 @@ import HeaderNav from "@/components/HeaderNav";
 import LeftCategorySidebar from "@/components/LeftCategorySidebar";
 import RightCategorySidebar from "@/components/RightCategorySidebar";
 import Hero from "@/sections/Hero";
-import OfficialDex from "@/sections/OfficialDex";
-import PersonalDex from "@/sections/PersonalDex";
 import RecordGallery from "@/sections/RecordGallery";
 import MobileCategoryGrid from "@/components/MobileCategoryGrid";
 
@@ -108,8 +106,6 @@ export default function Dashboard() {
          */}
         <div className="col-span-12 lg:col-span-8 space-y-16 md:space-y-20 xl:space-y-28">
           <RecordGallery />
-          <OfficialDex />
-          <PersonalDex />
         </div>
 
         {/**

@@ -26,6 +26,7 @@ model TasteRecord {
   title     String
   desc      String?     // 한 줄 설명 (프론트의 caption에 해당)
   content   String?     // 상세 내용
+  recordedAt DateTime? // 사용자가 선택하는 날짜 (없으면 createdAt 기준으로 활용)
   category  String
   tagsJson  String?     // 태그 배열을 JSON 문자열로 저장 (DB 종류와 상관없이 쓰기 쉽게)
 
