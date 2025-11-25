@@ -1,79 +1,26 @@
 // src/server.ts
-/**********************************************************************************
- * 서버 시작(bootstrap) 파일 — 애플리케이션의 단일 진입점
- * ================================================================================
- * 이 파일의 역할(Responsibilities)
- *  1) .env 환경변수 로드
- *  2) Express 앱(app) 인스턴스를 가져와 HOST/PORT에서 리슨 시작
- *  3) 서버 레벨 에러(EADDRINUSE, EACCES 등) 처리
- *  4) 프로세스 종료 신호 및 전역 에러(uncaught/unhandled)를 감지하고
- *     안전 종료(shutdown)를 수행
- *
- * 중요 원칙
- *  - 이 파일에서는 "서버를 켠다/끄는 것"에만 집중합니다.
- *    (미들웨어/라우팅/비즈니스 로직은 모두 app.ts 및 하위 모듈에서 처리)
- *  - 기능 코드는 단일 버전만 유지합니다. (중복 선언/중복 export 금지)
- **********************************************************************************/
-
-/* ==============================================================================
- *  환경변수 로드 및 앱/환경 유틸 import
- * =========================================================================== */
-
-// ① .env 내용을 process.env에 주입
-import 'dotenv/config';
-
-// ② 미들웨어/라우팅이 설정된 Express 인스턴스
+import 'dotenv/config'; // .env 로드
 import app from './app';
-
-// ③ Zod 등으로 검증된 환경변수 객체
 import { env } from './utils/env';
 
-/* ==============================================================================
- *  호스트 / 포트 결정 로직
- * =========================================================================== */
-/**
- * HOST 결정
- *  - env 스키마에 HOST가 없을 수 있으므로, process.env를 직접 사용
- *  - 아무 값도 없으면 'localhost'로 폴백
- */
+// HOST 결정
 const HOST = (process.env.HOST ?? 'localhost').trim();
 
-/**
- * PORT 결정
- *  - env.PORT는 문자열이므로, 숫자로 변환하여 사용
- *  - 숫자로 변환할 수 없거나 0 이하이면 기본값 3000 사용
- *  - 0.0.0.0 에서 리슨하면 외부 접근 허용 (도커/클라우드 배포에서 흔히 사용)
- */
+// PORT 결정
 const parsedPort = Number(env.PORT);
-const PORT = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 3000;
+const PORT = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 4000;
 
-/* ==============================================================================
- *   서버 시작 (app.listen)
- * =========================================================================== */
-/**
- * 서버 시작
- *  - server 변수는 단 한 번만 선언 (중복 선언/중복 export 방지)
- *  - 콘솔 출력 시 0.0.0.0 은 개발자 친화적으로 localhost로 바꿔 보여줍니다.
- */
+// 서버 시작
 const server = app.listen(PORT, HOST, () => {
   const visibleHost = HOST === '0.0.0.0' ? 'localhost' : HOST;
-  console.log(`✅ Backend running on http://${visibleHost}:${PORT}`);
+
+  console.log(`==============================================`);
+  console.log(` Server listening on http://${visibleHost}:${PORT}`);
+  console.log(` (Backend running with process.env PORT=${env.PORT})`);
+  console.log(`==============================================`);
 });
 
-/* ==============================================================================
- *  서버 에러 핸들링
- * =========================================================================== */
-/**
- * 서버 에러 핸들링
- *  - 'error' 이벤트는 app.listen(...)에서 발생하는 네트워크 레벨 에러를 다룹니다.
- *  - 대표적인 에러 코드
- *    · EADDRINUSE: 이미 사용 중인 포트
- *    · EACCES    : 권한 부족(1024 미만 포트 등)
- *    · 기타      : 원본 에러 객체 그대로 로그에 출력
- *
- *  - 에러 발생 시 process.exitCode만 설정하고,
- *    실제 종료는 shutdown 흐름 또는 프로세스 종료 시점에서 이 값을 참고하도록 합니다.
- */
+// 서버 에러 핸들링
 server.on('error', (err: NodeJS.ErrnoException) => {
   if (err.code === 'EADDRINUSE') {
     console.error(`❌ Port ${PORT} is already in use`);
@@ -83,66 +30,22 @@ server.on('error', (err: NodeJS.ErrnoException) => {
     console.error('❌ Server error:', err);
   }
 
-  // 종료 코드만 설정(실제 종료는 아래 shutdown 또는 프로세스 종료 루틴에서 처리)
   process.exitCode = 1;
 });
 
-/* ==============================================================================
- *  안전 종료(shutdown) 유틸리티
- * =========================================================================== */
-/**
- * 안전 종료(shutdown)
- *  @param reason 종료 사유(신호/예외 종류 등 텍스트)
- *
- *  - server.close():
- *      · 기존에 수립된 연결을 정상 종료한 뒤 콜백을 호출합니다.
- *      · 새 연결은 더 이상 받지 않습니다.
- *  - 예외 상황에서도 프로세스가 영구 정지하지 않도록 5초 타임아웃을 두고
- *    강제 종료를 보강합니다.
- */
+// 안전 종료 함수
 function shutdown(reason: string) {
   console.log(`🛑 Shutting down (${reason})`);
-
   try {
-    // 기존 연결을 정상 종료 후, 설정된 exitCode로 프로세스 종료
     server.close(() => process.exit(process.exitCode ?? 0));
   } catch (e) {
-    // 종료 과정에서 에러가 나더라도, 로그만 남기고 종료를 진행
     console.error('❌ Error during shutdown:', e);
     process.exit(process.exitCode ?? 1);
   }
-
-  // 혹시 모를 핸들링 지연/교착을 방지하기 위한 최후의 방어선 (최대 5초 후 강제 종료)
   setTimeout(() => process.exit(process.exitCode ?? 0), 5000);
 }
 
-/* ==============================================================================
- *   프로세스 레벨 신호/예외 바인딩
- * =========================================================================== */
-/**
- * 프로세스 신호 및 전역 에러 바인딩
- *
- *  - SIGINT
- *      · 터미널에서 Ctrl + C 입력 시 발생하는 인터럽트 신호
- *      · 보통 로컬 개발 환경에서 서버를 끌 때 발생
- *
- *  - SIGTERM
- *      · 컨테이너/오케스트레이터(예: Docker, Kubernetes)가
- *        "정상 종료"를 요청할 때 보내는 신호
- *      · 서버는 이를 감지해 shutdown 루틴을 수행한 뒤 종료
- *
- *  - uncaughtException
- *      · try/catch로 잡지 못한 동기 예외
- *      · 이 상태에서 서버를 계속 돌리면 위험하므로 반드시 로그를 남기고 종료
- *
- *  - unhandledRejection
- *      · 처리되지 않은 Promise 거부(rejection)
- *      · 마찬가지로 로그를 남기고 안전 종료 루틴으로 수렴
- *
- *  ▶ 공통 정책
- *    · 어떤 경로로든 전역 에러/신호가 들어오면 반드시 shutdown()을 호출해서
- *      동일한 방식으로 서버를 종료합니다.
- */
+// 전역 예외 처리
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 
@@ -156,15 +59,4 @@ process.on('unhandledRejection', (reason) => {
   shutdown('unhandledRejection');
 });
 
-/* ==============================================================================
- *   default export
- * =========================================================================== */
-/**
- * default export
- *  - 통합 테스트 등에서 server 인스턴스를 직접 가져와 close()할 때 유용합니다.
- *    예)
- *      import server from '../src/server';
- *      // 테스트 종료 후
- *      server.close();
- */
 export default server;
