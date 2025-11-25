@@ -4,11 +4,11 @@ import app from './app';
 import { env } from './utils/env';
 
 // HOST 결정
-const HOST = (process.env.HOST ?? 'localhost').trim();
+const HOST = '0.0.0.0';
 
 // PORT 결정
 const parsedPort = Number(env.PORT);
-const PORT = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 4000;
+const PORT = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 3000;
 
 // 서버 시작
 const server = app.listen(PORT, HOST, () => {

@@ -2,11 +2,28 @@
   "name": "cloud-teamproject",
   "private": true,
   "version": "1.0.0",
+
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+
+    "cap:init": "npx cap init WalkReco com.yourapp.walkreco",
+    "cap:add:android": "npx cap add android",
+    "cap:add:ios": "npx cap add ios",
+
+    "cap:copy": "npx cap copy",
+    "cap:sync": "npx cap sync",
+
+    "cap:open:android": "npx cap open android",
+    "cap:open:ios": "npx cap open ios"
+  },
+
   "devDependencies": {
     "@vitejs/plugin-react": "^5.1.0",
     "typescript": "^5.9.3",
     "vite": "^7.2.2"
   },
+
   "dependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

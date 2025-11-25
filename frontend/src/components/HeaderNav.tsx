@@ -157,8 +157,14 @@ export default function HeaderNav({
                 <div className="group">
                   <NavItem to="#">랜덤탐험미션</NavItem>
                 </div>
+
+                {/* 🔹 여기 새로 추가: /map 으로 가는 버튼 */}
+                <div className="group">
+                  <NavItem to="/map">지도</NavItem>
+                </div>
               </div>
             </div>
+
 
             {/* 우측 로그인/로그아웃 영역 */}
             <div className="ml-auto flex items-center gap-3">

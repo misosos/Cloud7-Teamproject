@@ -10,10 +10,16 @@ const KAKAO_BASE_URL =
 
 // .env 에서 가져오는 카카오 REST API 키
 const KAKAO_API_KEY = process.env.KAKAO_REST_API_KEY;
+const KAKAO_MOBILITY_KEY = process.env.KAKAO_MOBILITY_REST_KEY; // ⭐ 추가됨
 
 if (!KAKAO_API_KEY) {
   console.warn(
     '[WARN] KAKAO_REST_API_KEY is not set. /api/places 호출 시 오류가 날 수 있습니다.',
+  );
+}
+if (!KAKAO_MOBILITY_KEY) {
+  console.warn(
+    '[WARN] KAKAO_MOBILITY_REST_KEY is not set. /api/places/optimize 호출 시 오류가 날 수 있습니다.',
   );
 }
 
@@ -149,8 +155,8 @@ async function fetchPlacesByGroupCode(
       x,
       y,
       radius,
-      sort: 'distance', // 거리순
-      size: 15, // 카카오 한 페이지 최대 15
+      sort: 'distance',
+      size: 15,
     },
   });
 
@@ -158,11 +164,7 @@ async function fetchPlacesByGroupCode(
 }
 
 /**
- * GET /api/places?x=경도&y=위도&radius=2000
- *
- * - x: 경도 (필수)
- * - y: 위도 (필수)
- * - radius: 검색 반경(m), 기본값 2000
+ * GET /api/places
  */
 router.get('/', async (req, res) => {
   try {
@@ -180,7 +182,6 @@ router.get('/', async (req, res) => {
         ? radius.trim()
         : '2000';
 
-    // CT1, AT4, CE7, FD6 를 병렬로 호출
     const results = await Promise.all(
       FUN_CATEGORY_GROUPS.map((code) =>
         fetchPlacesByGroupCode({
@@ -192,7 +193,6 @@ router.get('/', async (req, res) => {
       ),
     );
 
-    // 배열 평탄화 + id 기준으로 중복 제거
     const mergedMap = new Map<string, PlaceDTO>();
     results.flat().forEach((place) => {
       mergedMap.set(place.id, place);
@@ -214,5 +214,64 @@ router.get('/', async (req, res) => {
     });
   }
 });
+
+/**
+ * ⭐ POST /api/places/optimize
+ * 카카오 모빌리티 경로 최적화 API
+ */
+// 맨 위에 있던 import와 router, 기존 GET('/') 라우트들은 그대로 두고,
+// router.get('/', ...) 밑에 이걸 넣어주세요.
+
+router.post('/optimize', async (req, res) => {
+  try {
+    if (!KAKAO_MOBILITY_KEY) {
+      return res.status(500).json({
+        ok: false,
+        error: 'KAKAO_MOBILITY_REST_KEY is not configured',
+      });
+    }
+
+    const { origin, destination, waypoints = [], priority = 'RECOMMEND' } =
+      req.body;
+
+    if (!origin || !destination) {
+      return res
+        .status(400)
+        .json({ ok: false, error: 'origin, destination은 필수입니다.' });
+    }
+
+    const params: any = {
+      origin,
+      destination,
+      priority,
+      road_details: true,
+    };
+
+    if (Array.isArray(waypoints) && waypoints.length > 0) {
+      params.waypoints = waypoints.join('|');
+    }
+
+    const kakaoRes = await axios.get(
+      'https://apis-navi.kakaomobility.com/v1/directions',
+      {
+        params,
+        headers: {
+          Authorization: `KakaoAK ${KAKAO_MOBILITY_KEY}`,
+          KA: "sdk/1.0 os=web origin=http://localhost" // ⭐⭐ 핵심 FIX ⭐⭐
+        },
+      },
+    );
+
+    return res.json(kakaoRes.data);
+  } catch (err: any) {
+    console.error('/api/places/optimize error:', err.response?.data || err);
+    return res.status(500).json({
+      ok: false,
+      error: err.response?.data || 'kakao-mobility-request-failed',
+    });
+  }
+});
+
+
 
 export default router;

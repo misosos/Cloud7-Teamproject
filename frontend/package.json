@@ -4,13 +4,24 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview",
-    "mock": "json-server --watch mock/db.json --port 4001 --delay 400"
+  "dev": "vite",
+  "build": "vite build",
+
+  "cap:init": "npx cap init WalkReco com.yourapp.walkreco",
+  "cap:add:android": "npx cap add android",
+  "cap:add:ios": "npx cap add ios",
+
+  "cap:copy": "npx cap copy",
+  "cap:sync": "npx cap sync",
+
+  "cap:open:android": "npx cap open android",
+  "cap:open:ios": "npx cap open ios"
   },
   "dependencies": {
+    "@capacitor/android": "^7.4.4",
+    "@capacitor/cli": "^7.4.4",
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/ios": "^7.4.4",
     "bcrypt": "^6.0.0",
     "connect-redis": "^9.0.0",
     "cors": "^2.8.5",
