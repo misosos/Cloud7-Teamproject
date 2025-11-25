@@ -1,12 +1,12 @@
 ## Frontend 초기 설정
 ```bash
-# 1) 설치
 cd frontend
 npm install
 
-# 2) 개발 서버 실행 
+# 중요!! frontend 폴더 안에서 .env 파일 만들기 (.env.example 파일 내용 복붙)
+
+# 개발 서버 실행
 npm run dev
-# http://localhost:5173 (Vite 기본 포트)
 
 ```
 > **문제 해결:** `vite: command not found` 에러가 발생하면 아래를 한 번만 설치 후 다시 실행하세요.
@@ -17,16 +17,54 @@ npm run dev
 > npm run dev
 > ```
 
-## Backend 초기 설정
+## Backend 초기 설정 & Database & Session 설정
+
+### 1) 의존성 설치 (backend)
 ```bash
 cd backend
 npm install
-# .env 파일 만들기 (.env.example 파일 내용 복붙)
-npm run dev
-# 서버가 뜨면: http://localhost:3000/health
+
+# 중요!! backend 폴더 안에서 .env 파일 만들기 (.env.example 파일 내용 복붙)
+
+# Prisma & DB 클라이언트
+npm i @prisma/client
+npm i -D prisma
+
+# 세션 & 쿠키
+npm i express-session cookie-parser
+npm i -D @types/express-session @types/cookie-parser
+
+# CORS (프론트-백엔드 분리 개발 시 필요)
+npm i cors
+npm i -D @types/cors
+
+# (선택) 보안/로그/속도제한
+npm i helmet morgan express-rate-limit
 ```
-### 자주 나는 이슈 & 해결
-- **포트 점유**: `PORT` 변경하거나 기존 프로세스 종료 후 재시작.
-- **CORS 타입 에러**: `npm i -D @types/cors`
-- **ES 모듈 import 오류**: `tsconfig.json`에 `"esModuleInterop": true` 설정.
-- **서버 접속 불가**: `npm run dev`가 실행 중인지 확인 → `curl /health`로 점검.
+
+### 2) Prisma 준비 (SQLite)
+```bash
+# Prisma 클라이언트 생성
+npx prisma generate
+
+# 최초 스키마 적용(개발용) — 마이그레이션 생성 + 적용
+npx prisma migrate dev --name init
+
+# 팀 동기화/배포 환경 — 기존 마이그레이션만 적용
+npx prisma migrate deploy
+
+# (선택) 시드 데이터 투입
+npx prisma db seed
+```
+
+## 테스트 (터미널 창 2개 띄우기)
+```bash
+# 1) 프론트엔드 개발 서버 실행 
+cd frontend
+npm run dev
+
+# 2) 백엔드 개발 서버 실행
+cd backend
+npm run dev
+
+```

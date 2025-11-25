@@ -1,32 +1,56 @@
-//middlewares/authRequired.ts
+/// <reference path="../types/session.d.ts" />
 // src/middlewares/authRequired.ts
 import type { Request, Response, NextFunction } from 'express';
 
 /**
- * 로그인 보호 미들웨어 (세션 쿠키 기반)
+ * ──────────────────────────────────────────────────────────────────────────
+ *  로그인 보호 미들웨어 (세션 쿠키 기반)
+ * ──────────────────────────────────────────────────────────────────────────
+ * 이 미들웨어는 **세션(Session) 쿠키**를 이용해 로그인 여부를 판별합니다.
  *
- * ✅ 목적
- * - "로그인이 필요한 API" 앞단에서 세션에 사용자 정보가 있는지 검사합니다.
- * - 없으면 401(Unauthorized)을 반환하고, 있으면 다음 핸들러로 넘깁니다.
+ * [동작 개요]
+ * - 서버에서 로그인 성공 시 컨트롤러에서
+ *     `req.session.user = { id, email, name?, role? }`
+ *   형태로 최소 사용자 정보를 저장합니다.
+ * - 보호가 필요한 라우트에서 이 미들웨어를 사용하면,
+ *   세션에 사용자 정보가 있는지 검사합니다.
+ * - 통과한 경우 `req.currentUser`에 동일한 객체를 주입하여
+ *   이후 핸들러에서 편하게 쓸 수 있습니다.
  *
- * 🔌 A안(얇은 Zustand) 프론트 연동 컨벤션
- * - 부팅 시:  /auth/me 호출 → 200이면 user 세팅, 401이면 비로그인
- * - 로그인:   성공 후 스토어에 user 넣고, 필요 시 /auth/me 재요청
- * - 로그아웃: 서버 /auth/logout 호출 + 스토어 초기화
+ * [프론트엔드 연동 규칙]
+ * - 앱 부팅:  `/auth/me` 호출
+ *   - 응답 200 + user 있으면 → 로그인 상태로 세팅
+ *   - 응답 200 + user null이면 → 비로그인 상태로 세팅
+ * - 로그인:  `/auth/login` 성공 시
+ *   - 서버가 세션에 user 저장 → 이후 요청부터 자동 인증
+ * - 로그아웃: `/auth/logout` 호출 시
+ *   - 서버에서 세션 파기 → 프론트 스토어도 초기화
  *
- * 🧠 구현 메모
- * - 아직 실제 로그인/세션 저장 로직이 없어도 이 파일은 안전하게 임포트 가능해야 합니다.
- *   → req.session 타입 의존성을 강제하지 않고 (req as any).session 형태로 접근합니다.
- * - 로그인 성공 시 컨트롤러에서 req.session.user = { id, email, role, ... } 형태로 저장한다고 가정합니다.
+ * [자주 겪는 이슈]
+ * 1) 401이 계속 발생하는 경우
+ *    - CORS 설정에서 `credentials: true` 누락 여부 확인 (서버/클라이언트 모두)
+ *    - 쿠키 옵션(`sameSite`, `secure`)이 프론트/백엔드 도메인 조합에 맞는지 확인
+ *    - 프론트 fetch/axios 요청에 `withCredentials: true` 옵션이 빠지지 않았는지 체크
+ *
+ * 2) 타입 오류가 나는 경우
+ *    - `req.currentUser` 타입 선언은 `src/types/session.d.ts`에서
+ *      **선언 병합(Declaration Merging)** 으로 확장해야 합니다.
+ *
+ * 3) 프록시/리버스 프록시 환경
+ *    - HTTPS 및 프록시 사용 시 `app.set('trust proxy', 1)` 설정을 고려하세요.
+ *      (쿠키의 `secure` 옵션 및 `X-Forwarded-*` 헤더 처리에 필요할 수 있음)
  */
-export default function authRequired(req: Request, res: Response, next: NextFunction) {
-  // 1) 세션/전략별로 다양한 위치에 유저가 담길 수 있으므로 가능한 후보를 모두 확인
-  //    - 세션 전략: req.session.user
-  //    - 패스포트/커스텀 전략: req.user
-  const userFromSession = (req as any)?.session?.user;
-  const user = (req as any).user ?? userFromSession;
+export default function authRequired(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  // 1) 세션에 저장된 사용자 정보만 신뢰합니다.
+  //    - 로그인 성공 시 컨트롤러에서
+  //      `req.session.user = { id, email, name?, role? }` 형태로 저장했다고 가정합니다.
+  const user = req.session?.user;
 
-  // 2) 없으면 401 응답
+  // 2) 세션에 사용자 정보가 없으면 401(UNAUTHORIZED) 반환
   if (!user) {
     return res.status(401).json({
       ok: false,
@@ -35,81 +59,104 @@ export default function authRequired(req: Request, res: Response, next: NextFunc
     });
   }
 
-  // 3) 다운스트림에서 편하게 쓰도록 currentUser로 노출(선택)
-  (req as any).currentUser = user;
+  // 3) 하위 핸들러 편의를 위해 currentUser에 주입
+  //    - 타입은 session.d.ts에서 Request 인터페이스를 확장하여 선언되어 있어야 합니다.
+  req.currentUser = user;
 
-  // 4) 통과
+  // 4) 다음 미들웨어/핸들러로 진행
   return next();
 }
 
+/**
+ * ──────────────────────────────────────────────────────────────────────────
+ *  역할(Role) 기반 접근 제어 미들웨어 (선택 기능)
+ * ──────────────────────────────────────────────────────────────────────────
+ * 특정 역할(예: 'admin', 'manager')에게만 허용하고 싶을 때 사용합니다.
+ *
+ * 사용 예:
+ *   router.post(
+ *     '/admin-only',
+ *     authRequired,
+ *     requireRole('admin'),
+ *     handler,
+ *   );
+ *
+ * [동작 규칙]
+ * - 로그인 여부 확인:
+ *   - `req.currentUser`가 있으면 우선 사용
+ *   - 없으면 `req.session.user`를 보조로 확인
+ * - roles 인자가 비어 있으면:
+ *   - 역할 검사를 하지 않고, 로그인만 되어 있으면 통과
+ * - user.role이 없으면:
+ *   - 별도의 역할 정보가 없는 상태이므로, 역할 검사는 스킵
+ *   - 즉, "로그인 사용자면 모두 허용" 패턴으로 동작
+ * - 역할을 반드시 강제하려면:
+ *   - 회원 객체 저장 시 role을 반드시 세팅해 주세요.
+ */
+export function requireRole(...roles: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    // currentUser가 있으면 우선 사용하고, 없으면 session.user를 보조로 확인
+    const user = req.currentUser ?? req.session?.user;
+
+    // 로그인 상태가 아니면 401
+    if (!user) {
+      return res.status(401).json({ ok: false, error: 'UNAUTHORIZED' });
+    }
+
+    // 🔧 roles가 비어 있으면 역할 검사는 스킵 (로그인만 되었으면 통과)
+    if (roles.length === 0) return next();
+
+    // user.role이 존재할 때만 역할 검사 수행
+    if (user.role && !roles.includes(user.role)) {
+      return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
+    }
+
+    return next();
+  };
+}
+
 /* =============================================================================
-   사용법 (예시)
-   -----------------------------------------------------------------------------
-   // src/routes/auth.routes.ts
-   import { Router } from 'express';
-   import authRequired from '../middlewares/authRequired';
-   import { getProfile } from '../controllers/auth.controller';
+   CORS / 세션 쿠키 설정 체크리스트 (app.ts 설정 예시)
+   =============================================================================
 
-   const router = Router();
-   router.get('/me', authRequired, getProfile); // 보호 라우트
-   export default router;
-
-   // src/controllers/auth.controller.ts
-   export const getProfile = (req, res) => {
-     // 로그인된 사용자 정보
-     const user = (req as any).currentUser; // 또는 (req as any).session.user
-     return res.json({ ok: true, user });
-   };
-
-   // (참고) 로그인 성공 시 세션 저장 컨벤션
-   // req.session.user = { id: dbUser.id, email: dbUser.email, role: dbUser.role };
-
-   -----------------------------------------------------------------------------
-   CORS / 쿠키 체크리스트 (app.ts)
-   -----------------------------------------------------------------------------
+   1) CORS: 반드시 credentials 허용 + 프론트 도메인 지정
+   ---------------------------------------------------------------------------
    app.use(
      cors({
-       origin: ENV.CORS_ORIGIN,   // 프론트 주소
-       credentials: true,         // 쿠키 전달 허용
-     })
+       origin: ENV.CORS_ORIGIN,   // 예: 'http://localhost:5173'
+       credentials: true,         // 쿠키 전송 허용 (핵심)
+     }),
    );
 
+   2) 세션/쿠키: sameSite/secure 값은 도메인/프로토콜 조합에 맞춰 조정
+   ---------------------------------------------------------------------------
    app.use(
      session({
-       name: 'sid',
-       secret: ENV.SESSION_SECRET,
+       name: 'sid',                       // 세션 쿠키 이름
+       secret: ENV.SESSION_SECRET,        // .env에서 관리
        resave: false,
        saveUninitialized: false,
        cookie: {
-         httpOnly: true,
-         sameSite: 'lax', // 서로 다른 도메인 사용 시 'none'(+ secure: true)
-         secure: ENV.NODE_ENV === 'production',
-         maxAge: 1000 * 60 * 60 * 24 * 7, // 7일
+         httpOnly: true,                  // XSS 방지 (클라이언트 JS에서 접근 불가)
+         sameSite: 'lax',                 // 서로 다른 도메인/포트 조합이면 'none' + secure 필요
+         secure: ENV.NODE_ENV === 'production', // HTTPS에서만 전송 (개발 환경에서는 false)
+         maxAge: 1000 * 60 * 60 * 24 * 7,       // 7일
        },
-     })
+     }),
    );
 
-   -----------------------------------------------------------------------------
-   역할 기반 보호가 필요하다면 (선택 기능)
-   -----------------------------------------------------------------------------
-   export function requireRole(...roles: string[]) {
-     return (req: Request, res: Response, next: NextFunction) => {
-       const user = (req as any)?.session?.user ?? (req as any).user;
-       if (!user) {
-         return res.status(401).json({ ok: false, error: 'UNAUTHORIZED' });
-       }
-       if (!roles.includes(user.role)) {
-         return res.status(403).json({ ok: false, error: 'FORBIDDEN' });
-       }
-       next();
-     };
-   }
-   // 사용 예: router.post('/admin-only', authRequired, requireRole('admin'), handler);
+   3) 프론트엔드(axios/fetch)에서 반드시 withCredentials/credentials 설정
+   ---------------------------------------------------------------------------
+   // axios 예시:
+   //   axios.get('/auth/me', { withCredentials: true });
+   //
+   // fetch 예시:
+   //   fetch('/auth/me', { credentials: 'include' });
 
-   -----------------------------------------------------------------------------
-   디버깅 팁
-   -----------------------------------------------------------------------------
-   - 쿠키가 안 실리면: 프론트 fetch/axios에 credentials: 'include' 옵션을 추가했는지 확인
-   - /auth/me가 항상 401이면: 로그인 핸들러에서 req.session.user가 제대로 세팅되는지 확인
-   - 개발 모드에서 다른 도메인/포트를 쓰면: sameSite/secure 조합이 맞는지 점검
-   ============================================================================= */
+   4) Production 환경(HTTPS, 프록시)에서 추가 팁
+   ---------------------------------------------------------------------------
+   // - app.set('trust proxy', 1) 설정 시,
+   //   secure 쿠키 및 X-Forwarded-* 헤더 처리에 도움이 됩니다.
+   // - 여러 서브도메인에서 공통 쿠키를 쓰고 싶다면
+   //   cookie.domain 옵션(예: '.example.com')을 고려하세요.
+ */  
