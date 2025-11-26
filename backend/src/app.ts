@@ -15,12 +15,13 @@ import helmet from 'helmet';
 import compression from 'compression';
 import path from 'path';
 
-import routes from './routes'; 
+import routes from './routes';
 import tasteRecordsRouter from './routes/tasteRecords.routes';
 import uploadRouter from './routes/upload.routes';
 import placesRouter from './routes/places.routes';
 
 import { env } from './utils/env';
+const isProd = env.NODE_ENV === 'production';
 
 const app = express();
 
@@ -28,11 +29,10 @@ const app = express();
 
 app.disable('x-powered-by');
 app.use(morgan('dev'));
-
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
-  }),
+  })
 );
 
 app.use(compression());
@@ -45,42 +45,69 @@ app.use('/api/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 app.use(cookieParser());
 
+
+// ⭐⭐ [중요] 요청 로깅 – 요청이 아예 서버에 오는지 확인용
+app.use((req, _res, next) => {
+  console.log(
+    `[REQ] ${req.method} ${req.path} | Origin=${req.headers.origin}`
+  );
+  next();
+});
+
+
 // ======================= CORS 설정 =========================
 
-const allowedOrigins = env.CORS_ORIGIN.split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
+// ⭐⭐⭐ 개발 환경에서는 origin 전부 허용 (앱/웹 붙게 하기)
+if (env.NODE_ENV !== 'production') {
+  console.log('⚠ 개발 환경 – CORS 모든 Origin 허용 중');
+  app.use(
+    cors({
+      origin: true,              // 어떤 origin이든 허용
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      optionsSuccessStatus: 204,
+    })
+  );
+} else {
+  // ⭐ 운영 환경 – 너의 기존 strict CORS 유지
+  const allowedOrigins = env.CORS_ORIGIN.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
 
-const corsOptions: CorsOptions = {
-  origin(origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+  const corsOptions: CorsOptions = {
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
 
-    const allowLocalhost = allowedOrigins.some((o) =>
-      o.startsWith('http://localhost:'),
-    );
-    const allow127 = allowedOrigins.some((o) =>
-      o.startsWith('http://127.0.0.1:'),
-    );
+      const allowLocalhost = allowedOrigins.some((o) =>
+        o.startsWith('http://localhost:')
+      );
+      const allow127 = allowedOrigins.some((o) =>
+        o.startsWith('http://127.0.0.1:')
+      );
 
-    if (origin.startsWith('http://localhost:') && allowLocalhost)
-      return callback(null, true);
-    if (origin.startsWith('http://127.0.0.1:') && allow127)
-      return callback(null, true);
+      if (origin.startsWith('http://localhost:') && allowLocalhost)
+        return callback(null, true);
+      if (origin.startsWith('http://127.0.0.1:') && allow127)
+        return callback(null, true);
 
-    callback(new Error(`Not allowed by CORS: ${origin}`));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  optionsSuccessStatus: 204,
-};
+      callback(new Error(`Not allowed by CORS: ${origin}`));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    optionsSuccessStatus: 204,
+  };
 
-app.use(cors(corsOptions));
+  app.use(cors(corsOptions));
+}
 
 app.set('trust proxy', 1);
 
+console.log('[APP] NODE_ENV =', env.NODE_ENV, 'isProd =', isProd);
 // ======================= 세션 설정 =========================
+
 
 app.use(
   session({
@@ -89,15 +116,11 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      httpOnly: true,
-      sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax',
-      secure: env.NODE_ENV === 'production',
-      domain:
-        env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN
-          ? process.env.COOKIE_DOMAIN
-          : undefined,
+     httpOnly: true,
+     sameSite: 'none',
+     secure: false,
     },
-  }),
+  })
 );
 
 // ======================= 루트 경로 =========================
@@ -110,22 +133,14 @@ app.get('/', (_req, res) => {
   });
 });
 
+
 // ======================= 라우터 등록 =========================
 
-// 업로드 API
 app.use('/api/uploads', uploadRouter);
-
-// 취향 기록 API
 app.use('/api/taste-records', tasteRecordsRouter);
-
-// ⭐ 카카오맵 장소/경로 API  
-//   → /api/places/search  
-//   → /api/places/directions  
-//   → /api/places/optimize 
 app.use('/api/places', placesRouter);
-
-// 기존 공통 API (/auth, /health 등)
 app.use('/api', routes);
+
 
 // ======================= 404 핸들러 =========================
 
@@ -137,6 +152,7 @@ app.use((req: Request, res: Response) => {
     method: req.method,
   });
 });
+
 
 // ======================= 전역 오류 처리 =========================
 
@@ -150,7 +166,7 @@ app.use(
           ? err.message
           : 'Internal Server Error',
     });
-  },
+  }
 );
 
 export default app;

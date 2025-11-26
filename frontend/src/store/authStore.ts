@@ -190,7 +190,7 @@ export const useAuth = create<AuthState>()(
         const nextIsLoggedIn = !!user;
         set({
           user,
-          token,
+          token: token ?? null, // ⭐ 토큰 정확히 저장
           isLoggedIn: nextIsLoggedIn,
           ready: true,
         });
@@ -209,37 +209,21 @@ export const useAuth = create<AuthState>()(
         try {
           const raw = await apiClient.post("/auth/login", { email, password });
 
-          let user: User | null = null;
-
-          if (raw && typeof raw === "object") {
-            const anyRaw = raw as any;
-
-            if ("user" in anyRaw) {
-              // { ok, user }
-              user = (anyRaw.user ?? null) as User | null;
-            } else if ("data" in anyRaw && anyRaw.data && typeof anyRaw.data === "object") {
-              const data = anyRaw.data as any;
-              if ("user" in data) {
-                // { ok, data: { user } }
-                user = (data.user ?? null) as User | null;
-              } else {
-                // { ok, data: { ...userFields } } 라고 가정
-                user = data as User;
-              }
-            }
-          }
+          const anyRaw = raw as any;
+          const user = anyRaw?.user ?? null;
+          const token = anyRaw?.token ?? null; // ⭐ 백엔드 토큰 받음
 
           if (user) {
-            set({ user, token: null, isLoggedIn: true, ready: true });
+            set({ user, token, isLoggedIn: true, ready: true }); // ⭐ 토큰 저장
             return user;
           }
 
           return null;
         } catch {
-          // 에러 내용은 상위(컴포넌트/서비스)에서 처리하도록 null만 반환
           return null;
         }
       },
+
 
       /**
        * 편의 메서드: 회원가입 API 요청 + 스토어 업데이트를 한 번에 수행
@@ -252,28 +236,12 @@ export const useAuth = create<AuthState>()(
         try {
           const raw = await apiClient.post("/auth/register", { email, password, name });
 
-          let user: User | null = null;
-
-          if (raw && typeof raw === "object") {
-            const anyRaw = raw as any;
-
-            if ("user" in anyRaw) {
-              // { ok, user }
-              user = (anyRaw.user ?? null) as User | null;
-            } else if ("data" in anyRaw && anyRaw.data && typeof anyRaw.data === "object") {
-              const data = anyRaw.data as any;
-              if ("user" in data) {
-                // { ok, data: { user } }
-                user = (data.user ?? null) as User | null;
-              } else {
-                // { ok, data: { ...userFields } } 라고 가정
-                user = data as User;
-              }
-            }
-          }
+          const anyRaw = raw as any;
+          const user = anyRaw?.user ?? null;
+          const token = anyRaw?.token ?? null; // ⭐ 토큰 저장
 
           if (user) {
-            set({ user, token: null, isLoggedIn: true, ready: true });
+            set({ user, token, isLoggedIn: true, ready: true }); // ⭐ 저장
             return user;
           }
 
@@ -282,6 +250,7 @@ export const useAuth = create<AuthState>()(
           return null;
         }
       },
+
 
       /**
        * setSession

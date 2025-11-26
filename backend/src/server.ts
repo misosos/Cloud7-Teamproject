@@ -4,7 +4,7 @@ import app from './app';
 import { env } from './utils/env';
 
 // HOST 결정
-const HOST = '0.0.0.0';
+const HOST = (process.env.HOST ?? '0.0.0.0').trim();
 
 // PORT 결정
 const parsedPort = Number(env.PORT);
