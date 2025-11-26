@@ -10,29 +10,46 @@ generator client {
 model User {
   id           Int      @id @default(autoincrement())
   email        String   @unique
-  name         String?  // 선택
-  passwordHash String   // 해시만 저장
-  role         String?  // 선택
+  name         String? // 선택
+  passwordHash String // 해시만 저장
+  role         String? // 선택
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
   tasteRecords TasteRecord[]
+  stays        Stay[] // 유저가 머물렀던 장소들
 }
 
 model TasteRecord {
-  id        String   @id @default(cuid())
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId Int
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  title     String
-  desc      String?     // 한 줄 설명 (프론트의 caption에 해당)
-  content   String?     // 상세 내용
+  title      String
+  desc       String? // 한 줄 설명 (프론트의 caption에 해당)
+  content    String? // 상세 내용
   recordedAt DateTime? // 사용자가 선택하는 날짜 (없으면 createdAt 기준으로 활용)
-  category  String
-  tagsJson  String?     // 태그 배열을 JSON 문자열로 저장 (DB 종류와 상관없이 쓰기 쉽게)
+  category   String
+  tagsJson   String? // 태그 배열을 JSON 문자열로 저장 (DB 종류와 상관없이 쓰기 쉽게)
 
-  thumb     String?     // 썸네일 이미지 URL (지금은 안 쓰면 null)
+  thumb     String? // 썸네일 이미지 URL (지금은 안 쓰면 null)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId, createdAt])
+}
+
+model Stay {
+  id     Int  @id @default(autoincrement())
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  lat       Float
+  lng       Float
+  startTime DateTime
+  endTime   DateTime
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, startTime])
 }
