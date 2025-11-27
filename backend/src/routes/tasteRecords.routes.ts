@@ -24,7 +24,7 @@ import {
   getTasteRecordsByUser,
   getTasteRecordByIdForUser,
   deleteTasteRecord,
-  // ✅ 인사이트용 서비스 함수 (tasteRecord.service.ts 에 구현 예정)
+  // ✅ 인사이트용 서비스 함수
   getTasteRecordInsightsByUser,
 } from '../services/tasteRecord.service';
 
@@ -65,20 +65,21 @@ type CreateTasteRecordBody = {
 // Request에서 현재 로그인한 userId(Int)를 안전하게 꺼내는 유틸입니다.
 //
 // - 우선순위:
-//   1) req.currentUser?.id (authRequired에서 넣어준 값)
+//   1) (req as AuthedRequest).currentUser?.id (authRequired에서 넣어준 값)
 //   2) req.session.user?.id (혹시 currentUser가 없을 경우 대비)
 //
 // - 반환:
 //   - 정수로 변환 가능한 경우: number
 //   - 없거나 NaN인 경우: null
 // ============================================================
-function getUserId(req: AuthedRequest): number | null {
+function getUserId(req: Request): number | null {
+  const authed = req as AuthedRequest;
   const sessionUser = (req as any).session?.user as
     | { id?: string }
     | undefined;
 
   const rawId =
-    req.currentUser?.id ??
+    authed.currentUser?.id ??
     sessionUser?.id ??
     null;
 
@@ -93,8 +94,8 @@ function getUserId(req: AuthedRequest): number | null {
 const router = Router();
 
 // 공통 Unauthorized 응답 헬퍼
-const sendUnauthorized = (res: Response) => {
-  return res.status(401).json({
+const sendUnauthorized = (res: Response): void => {
+  res.status(401).json({
     ok: false,
     error: 'UNAUTHORIZED',
     message: '로그인이 필요합니다.',
@@ -102,8 +103,8 @@ const sendUnauthorized = (res: Response) => {
 };
 
 // 공통 BadRequest 응답 헬퍼
-const sendBadRequest = (res: Response, message: string) => {
-  return res.status(400).json({
+const sendBadRequest = (res: Response, message: string): void => {
+  res.status(400).json({
     ok: false,
     error: 'BAD_REQUEST',
     message,
@@ -128,12 +129,13 @@ router.use(authRequired);
 // ============================================================
 router.post(
   '/',
-  async (req: AuthedRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       // 1) 로그인된 사용자 ID 추출
       const userId = getUserId(req);
       if (!userId) {
-        return sendUnauthorized(res);
+        sendUnauthorized(res);
+        return;
       }
 
       // 2) 요청 바디 구조 분해
@@ -143,13 +145,14 @@ router.post(
         content,
         category,
         tags,
-        thumb,      // ✅ 썸네일 URL (예: `/uploads/taste-records/xxx.jpg`)
-        visitedAt,  // ✅ 사용자가 선택한 날짜(문자열, 선택 사항)
+        thumb, // ✅ 썸네일 URL (예: `/uploads/taste-records/xxx.jpg`)
+        visitedAt, // ✅ 사용자가 선택한 날짜(문자열, 선택 사항)
       } = req.body as CreateTasteRecordBody;
 
       // 3) 필수 항목(title, category) 검증
       if (!title || !category) {
-        return sendBadRequest(res, 'title과 category는 필수입니다.');
+        sendBadRequest(res, 'title과 category는 필수입니다.');
+        return;
       }
 
       // 4) 날짜 문자열을 Date 객체로 변환 (옵션 필드)
@@ -175,7 +178,7 @@ router.post(
       });
 
       // 6) 프론트에서 사용하는 형태로 응답
-      return res.status(201).json({
+      res.status(201).json({
         ok: true,
         data,
       });
@@ -194,16 +197,17 @@ router.post(
 // ============================================================
 router.get(
   '/',
-  async (req: AuthedRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = getUserId(req);
       if (!userId) {
-        return sendUnauthorized(res);
+        sendUnauthorized(res);
+        return;
       }
 
       const data = await getTasteRecordsByUser(userId);
 
-      return res.json({
+      res.json({
         ok: true,
         data,
       });
@@ -231,11 +235,12 @@ router.get(
 // ============================================================
 router.get(
   '/insights',
-  async (req: AuthedRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = getUserId(req);
       if (!userId) {
-        return sendUnauthorized(res);
+        sendUnauthorized(res);
+        return;
       }
 
       const { from, to } = req.query as { from?: string; to?: string };
@@ -257,10 +262,11 @@ router.get(
         }
       }
 
-      // 서비스 레이어에 인사이트 집계 위임
+      // ⚠️ 현재 서비스 함수는 (userId)만 받도록 구현되어 있으므로
+      // fromDate, toDate는 이후 확장 시에 활용 가능
       const data = await getTasteRecordInsightsByUser(userId);
 
-      return res.json({
+      res.json({
         ok: true,
         data,
       });
@@ -278,29 +284,32 @@ router.get(
 // ============================================================
 router.get(
   '/:id',
-  async (req: AuthedRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = getUserId(req);
       if (!userId) {
-        return sendUnauthorized(res);
+        sendUnauthorized(res);
+        return;
       }
 
       const { id } = req.params;
       if (!id) {
-        return sendBadRequest(res, 'id 파라미터가 필요합니다.');
+        sendBadRequest(res, 'id 파라미터가 필요합니다.');
+        return;
       }
 
       const data = await getTasteRecordByIdForUser(userId, id);
 
       if (!data) {
-        return res.status(404).json({
+        res.status(404).json({
           ok: false,
           error: 'NOT_FOUND',
           message: '기록을 찾을 수 없습니다.',
         });
+        return;
       }
 
-      return res.json({
+      res.json({
         ok: true,
         data,
       });
@@ -318,30 +327,33 @@ router.get(
 // ============================================================
 router.delete(
   '/:id',
-  async (req: AuthedRequest, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = getUserId(req);
       if (!userId) {
-        return sendUnauthorized(res);
+        sendUnauthorized(res);
+        return;
       }
 
       const { id } = req.params;
       if (!id) {
-        return sendBadRequest(res, 'id 파라미터가 필요합니다.');
+        sendBadRequest(res, 'id 파라미터가 필요합니다.');
+        return;
       }
 
       // 서비스 레이어에 삭제 위임 (boolean 반환)
       const deleted = await deleteTasteRecord(userId, id);
 
       if (!deleted) {
-        return res.status(404).json({
+        res.status(404).json({
           ok: false,
           error: 'NOT_FOUND',
           message: '삭제할 기록을 찾을 수 없습니다.',
         });
+        return;
       }
 
-      return res.json({
+      res.json({
         ok: true,
         message: '기록이 삭제되었습니다.',
       });
