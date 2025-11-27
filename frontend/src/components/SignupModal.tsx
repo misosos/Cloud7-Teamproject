@@ -36,7 +36,7 @@
 */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import * as authService from "@/services/authService";
+import * as authService from "@/api/authService";
 
 // 외부에서 받을 props의 타입 정의
 type Props = {

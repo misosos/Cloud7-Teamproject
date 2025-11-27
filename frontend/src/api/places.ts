@@ -26,24 +26,26 @@ interface GetPlacesResponse {
   places: Place[];
 }
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
-
 export async function getNearbyPlaces(params: {
   x: number;
   y: number;
   radius?: number;
 }): Promise<Place[]> {
-  const url = new URL("/api/places", BASE_URL);
-  url.searchParams.set("x", String(params.x));
-  url.searchParams.set("y", String(params.y));
+  const search = new URLSearchParams();
+  search.set("x", String(params.x));
+  search.set("y", String(params.y));
   if (params.radius) {
-    url.searchParams.set("radius", String(params.radius));
+    search.set("radius", String(params.radius));
   }
 
-  const res = await fetch(url.toString());
+  const res = await fetch(`/api/places?${search.toString()}`, {
+    credentials: "include", // 세션/쿠키 사용하는 경우 같이 전송
+  });
+
   if (!res.ok) {
     throw new Error("장소 조회 실패");
   }
+
   const data: GetPlacesResponse = await res.json();
   return data.places;
 }

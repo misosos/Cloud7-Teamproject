@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import apiClient from "@/services/apiClient";
+import apiClient from "@/api/apiClient";
 
 const TONE_BASE = "rgba(232, 224, 208, 0.78)"; // 기본 우드톤
 const TONE_ACCENT = "rgba(206, 190, 153, 0.95)"; // 조금 더 진한 강조 색

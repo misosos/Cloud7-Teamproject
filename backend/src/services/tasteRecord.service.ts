@@ -154,18 +154,36 @@ export async function deleteTasteRecord(
 // ============================================================
 // [타입] 취향 인사이트 구조
 // ------------------------------------------------------------
-// - byCategory: 카테고리별 기록 개수
-// - byTag     : 태그별 기록 개수
-// - byMonth   : 연-월(YYYY-MM) 기준 기록 개수
+// - totalCount   : 전체 기록 개수
+// - byCategory   : 카테고리별 기록 개수 (단순 집계)
+// - byTag        : 태그별 기록 개수 (단순 집계)
+// - byMonth      : 연-월(YYYY-MM) 기준 기록 개수
 // - recentRecords: 최근 기록 10개 (카드용)
+// - categoryStats: 카테고리별 비율 포함 상세 통계
+// - tagStats     : 태그별 비율 포함 상세 통계
 // ============================================================
 export type TasteRecordDTO = ReturnType<typeof serialize>;
 
+export interface CategoryStat {
+  category: string;
+  count: number;
+  ratio: number; // 전체 대비 비율 (0~1)
+}
+
+export interface TagStat {
+  tag: string;
+  count: number;
+  ratio: number; // 전체 대비 비율 (0~1)
+}
+
 export interface TasteRecordInsights {
+  totalCount: number;
   byCategory: { category: string; count: number }[];
   byTag: { tag: string; count: number }[];
   byMonth: { month: string; count: number }[];
   recentRecords: TasteRecordDTO[];
+  categoryStats: CategoryStat[];
+  tagStats: TagStat[];
 }
 
 // ============================================================
@@ -185,6 +203,8 @@ export async function getTasteRecordInsightsByUser(
   });
 
   const serialized = records.map(serialize);
+
+  const totalCount = serialized.length;
 
   // 2) 집계용 맵 준비
   const categoryMap = new Map<string, number>();
@@ -231,6 +251,22 @@ export async function getTasteRecordInsightsByUser(
     .map(([month, count]) => ({ month, count }))
     .sort((a, b) => a.month.localeCompare(b.month)); // 오래된 달 → 최근 달 순
 
+  const categoryStats: CategoryStat[] = Array.from(categoryMap.entries())
+    .map(([category, count]) => ({
+      category,
+      count,
+      ratio: totalCount > 0 ? count / totalCount : 0,
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  const tagStats: TagStat[] = Array.from(tagMap.entries())
+    .map(([tag, count]) => ({
+      tag,
+      count,
+      ratio: totalCount > 0 ? count / totalCount : 0,
+    }))
+    .sort((a, b) => b.count - a.count);
+
   // 4) 최근 기록 10개 (recordDate 기준 내림차순)
   const recentRecords = serialized
     .slice()
@@ -238,9 +274,12 @@ export async function getTasteRecordInsightsByUser(
     .slice(0, 10);
 
   return {
+    totalCount,
     byCategory,
     byTag,
     byMonth,
     recentRecords,
+    categoryStats,
+    tagStats,
   };
 }

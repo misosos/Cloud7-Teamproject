@@ -54,3 +54,7 @@ Thumbs.db
 coverage/
 .nyc_output/
 *.lcov
+
+# User uploaded files (do not commit)
+backend/uploads/
+uploads/
