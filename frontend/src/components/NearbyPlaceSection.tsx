@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import PlacesList from "@/components/placesList";
 
-const NearbyTasteSection: React.FC = () => {
+const NearbyPlaceSection: React.FC = () => {
   const [lat, setLat] = useState<number | null>(null); // 위도
   const [lng, setLng] = useState<number | null>(null); // 경도
   const [locError, setLocError] = useState<string | null>(null);
@@ -42,7 +42,7 @@ const NearbyTasteSection: React.FC = () => {
             내 주변 가볼 곳
           </h2>
           <p className="mt-1 text-xs text-stone-500">
-            현재 위치 기준 반경 2km 안에서, 놀기 좋은 장소를 모아봤어요.
+            현재 위치 기준 반경 3km 안에서, 놀기 좋은 장소를 모아봤어요.
           </p>
         </div>
       </div>
@@ -67,4 +67,4 @@ const NearbyTasteSection: React.FC = () => {
   );
 };
 
-export default NearbyTasteSection;
+export default NearbyPlaceSection;
