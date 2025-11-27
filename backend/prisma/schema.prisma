@@ -40,16 +40,24 @@ model TasteRecord {
 }
 
 model Stay {
-  id     Int  @id @default(autoincrement())
-  userId Int
-  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        Int      @id @default(autoincrement())
+
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
 
   lat       Float
   lng       Float
   startTime DateTime
   endTime   DateTime
 
+  // 🔽 카카오 장소 + 카테고리 정보
+  kakaoPlaceId      String?   // Kakao place_id
+  categoryName      String?   // "문화시설 > 극장 > 영화관" 이런 원본 문자열
+  categoryGroupCode String?   // CT1 / AT4 / CE7 / FD6 ...
+  mappedCategory    String?   // '영화' | '공연' | '전시' | '문화시설' | '관광명소' | '카페' | '식당' | '기타'
+
   createdAt DateTime @default(now())
 
   @@index([userId, startTime])
+  @@index([userId, mappedCategory])
 }
