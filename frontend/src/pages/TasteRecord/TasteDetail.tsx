@@ -19,7 +19,7 @@
 
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import apiClient from "@/services/apiClient";
+import apiClient from "@/api/apiClient";
 import type { TasteRecordItem } from "@/types/type";
 
 // TasteRecordItem 안에서 "이미지 경로" 후보를 추출하는 헬퍼

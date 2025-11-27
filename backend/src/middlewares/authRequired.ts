@@ -1,6 +1,7 @@
 /// <reference path="../types/session.d.ts" />
 // src/middlewares/authRequired.ts
 import type { Request, Response, NextFunction } from 'express';
+import type { SessionUser } from '../types/session';
 
 /**
  * ──────────────────────────────────────────────────────────────────────────
@@ -159,4 +160,13 @@ export function requireRole(...roles: string[]) {
    //   secure 쿠키 및 X-Forwarded-* 헤더 처리에 도움이 됩니다.
    // - 여러 서브도메인에서 공통 쿠키를 쓰고 싶다면
    //   cookie.domain 옵션(예: '.example.com')을 고려하세요.
- */  
+ */ 
+
+// ──────────────────────────────────────────────────────────────────────────
+//  로그인된 사용자 요청 타입 (AuthedRequest)
+//  - authRequired 미들웨어를 지난 후에는 req.currentUser가 항상 존재한다고 가정할 수 있습니다.
+//  - 라우트 핸들러에서 Request 대신 AuthedRequest를 사용하면 타입 안전성이 올라갑니다.
+// ──────────────────────────────────────────────────────────────────────────
+export type AuthedRequest = Request & {
+  currentUser: SessionUser;
+};

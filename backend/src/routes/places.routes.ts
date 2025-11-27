@@ -1,6 +1,9 @@
 // src/routes/places.routes.ts
-import express from 'express';
+import express, { Request, Response } from 'express';
 import axios from 'axios';
+import authRequired from '../middlewares/authRequired';
+import type { AuthedRequest } from '../middlewares/authRequired';
+import { getPlacesRecommendedByTaste } from '../services/recommendation.service';
 
 const router = express.Router();
 
@@ -214,6 +217,70 @@ router.get('/', async (req, res) => {
     });
   }
 });
+
+/**
+ * GET /api/places/recommend-by-taste
+ * 내 취향 분석(카테고리 비율) + 현재 위치 기반 추천 장소
+ */
+router.get(
+  '/recommend-by-taste',
+  authRequired,
+  async (req: Request, res: Response) => {
+    try {
+      // ✅ authRequired를 지난 뒤에는 currentUser가 설정되어 있다고 가정
+      const { currentUser } = req as AuthedRequest;
+
+      if (!currentUser) {
+        return res.status(401).json({
+          ok: false,
+          error: '로그인이 필요합니다.',
+        });
+      }
+
+      const { x, y, radius } = req.query;
+
+      if (!x || !y) {
+        return res.status(400).json({
+          ok: false,
+          error: 'x(경도)와 y(위도)는 필수입니다.',
+        });
+      }
+
+      const lng = Number(x);
+      const lat = Number(y);
+      const radiusNum =
+        typeof radius === 'string' && radius.trim() !== ''
+          ? Number(radius)
+          : 2000;
+
+      if (Number.isNaN(lat) || Number.isNaN(lng)) {
+        return res.status(400).json({
+          ok: false,
+          error: 'x, y는 숫자여야 합니다.',
+        });
+      }
+
+      const places = await getPlacesRecommendedByTaste(
+        currentUser.id,
+        lat,
+        lng,
+        radiusNum,
+      );
+
+      return res.json({
+        ok: true,
+        count: places.length,
+        places,
+      });
+    } catch (error) {
+      console.error('[GET /api/places/recommend-by-taste] Error:', error);
+      return res.status(500).json({
+        ok: false,
+        error: '취향 기반 추천 조회 중 오류가 발생했습니다.',
+      });
+    }
+  },
+);
 
 /**
  * ⭐ POST /api/places/optimize

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import SectionTitle from "@/components/SectionTitle";
 import BookCard from "@/components/BookCard";
 import useCategory from "@/store/useCategory";
-import { httpGet } from "@/services/apiClient";
+import { httpGet } from "@/api/apiClient";
 import type { TasteRecordItem,TasteRecordListResponse } from "@/types/type";
 
 /**

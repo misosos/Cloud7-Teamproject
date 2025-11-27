@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { getNearbyPlaces, Place, MappedCategory } from "../api/places";
+import { getNearbyPlaces } from "../api/places";
+import type { Place, MappedCategory } from "../api/places";
 
 interface PlacesListProps {
   x: number; // 현재 위치 경도
