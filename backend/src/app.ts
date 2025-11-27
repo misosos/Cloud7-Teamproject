@@ -68,6 +68,7 @@ import { env } from './utils/env'; // 환경변수 로더/검증 유틸
 import placesRouter from './routes/places.routes';
 import staysRouter from "./routes/stays.routes";
 import tasteDashboardRouter from "./routes/tasteDashboard.routes";
+import recommendationsRouter from "./routes/recommendations.routes";
 
 /* ==============================================================================
  *  2. Express 앱 인스턴스 생성
@@ -280,6 +281,7 @@ app.use('/api/taste-records', tasteRecordsRouter);
 app.use('/api/places', placesRouter);
 app.use("/api/stays", staysRouter);
 app.use("/api/taste", tasteDashboardRouter);
+app.use("/api/recommendations", recommendationsRouter);
 
 // 그 외 공통 라우터는 /api 프리픽스로 묶어서 사용
 app.use('/api', routes);

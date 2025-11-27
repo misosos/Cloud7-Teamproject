@@ -18,6 +18,7 @@ model User {
 
   tasteRecords TasteRecord[]
   stays        Stay[] // 유저가 머물렀던 장소들
+  recommendations Recommendation[]
 }
 
 model TasteRecord {
@@ -60,4 +61,35 @@ model Stay {
 
   @@index([userId, startTime])
   @@index([userId, mappedCategory])
+
+  recommendations Recommendation[]
+}
+
+model Recommendation {
+  id        Int      @id @default(autoincrement())
+
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // stay는 옵션으로(없어도 됨)
+  stayId    Int?
+  stay      Stay?    @relation(fields: [stayId], references: [id], onDelete: Cascade)
+
+  kakaoPlaceId      String
+  name              String
+  categoryName      String?
+  categoryGroupCode String?
+  mappedCategory    String   // '영화' | '공연' | ... | '식당'
+
+  x         Float
+  y         Float
+  score     Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 같은 유저가 같은 장소에 대한 추천이 stay 단위로 하나씩만 있게 하고 싶으면:
+  @@unique([userId, kakaoPlaceId, stayId])
+
+  @@index([userId, score])
 }
