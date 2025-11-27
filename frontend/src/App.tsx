@@ -25,6 +25,7 @@ import TasteList from "@/pages/TasteRecord/TasteList"; // 기록 목록(보호 �
 import TasteDetail from "@/pages/TasteRecord/TasteDetail"; // 기록 상세(보호 라우트 내부)
 import BeforeLogin from "@/pages/BeforeLogin/BeforeLogin"; // 로그인 전 랜딩 페이지
 import ProtectedRoute from "@/routes/ProtectedRoute"; // 로그인 필요 가드
+import MapPage from "@/pages/Map/MapPage";         // 카카오맵 테스트 페이지
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error?: any }> {
   constructor(props: { children: React.ReactNode }) {
@@ -61,6 +62,7 @@ export default function App() {
               - 실제 로그인 성공 시, 로그인 모달/로직에서 /dashboard로 이동하도록 처리합니다.
             */}
             <Route path="/" element={<BeforeLogin />} />
+            <Route path="/map" element={<MapPage />} />
 
             {/**
              * 보호 라우트: 아래 자식 경로들은 로그인 상태에서만 접근 가능
