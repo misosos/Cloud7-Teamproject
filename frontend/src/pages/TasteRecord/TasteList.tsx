@@ -9,9 +9,9 @@
 // 화면 구성(위→아래)
 //  1) HeaderNav      : 상단 네비게이션(로그인 상태/메뉴/CTA)
 //  2) Hero(제목)     : "취향기록" 타이틀 섹션
-//  3) RecordSlider   : 카드(책 프레임)로 된 기록들을 좌우로 넘기며 보는 슬라이더
-//  4) AddButton      : "기록 추가" 버튼을 누르면 TasteRecordModal(작성 모달) 열림
-//  5) TasteRecordModal: 제목/캡션/카테고리/태그/내용을 입력받아 새 기록 작성
+//  3) TasteRecordModal: 제목/캡션/카테고리/태그/내용을 입력받아 새 기록 작성
+//  4) RecordSlider   : 카드(책 프레임)로 된 기록들을 좌우로 넘기며 보는 슬라이더
+//  5) AddButton      : "기록 추가" 버튼을 누르면 작성 영역을 열 수 있음
 //
 // 데이터 소스
 //  - recordsAll: 서버에서 /taste-records 로 조회한 실제 기록 목록
@@ -19,8 +19,7 @@
 
 import HeaderNav from "@/components/HeaderNav";
 import { useRef, useState, useEffect, useCallback } from "react";
-import TasteRecordModal from "@/components/TasteRecordModal";
-import FolderImg from "@/assets/ui/folder.png";
+import TasteRecordModal from "@/components/TasteRecordInlineForm";
 import BookCard from "@/components/BookCard";
 import type { TasteRecordItem } from "@/types/type";
 import { categoryOptions, tagOptions } from "@/data/mock";
@@ -52,35 +51,6 @@ function SectionTitle({
     </div>
   );
 }
-
-/**
- * FolderCard: 썸네일 + 제목 + 설명을 세로로 보여주는 소형 카드(그리드용)
- * - item.thumb가 없으면 폴더 아이콘(FolderImg)으로 대체 노출
- * - 현재는 사용하지 않지만(주석 처리된 "컬렉션" 섹션), 디자인 참고용으로 유지
- *
- * ※ 현재 컴포넌트 내에서 사용하지 않아 TS/ESLint 경고가 발생하므로
- *   아래 구현 전체를 주석 처리해 디자인 레퍼런스용으로만 남겨둡니다.
- */
-/*
-function FolderCard({ item }: { item: TasteRecordItem }) {
-  return (
-    <li className="flex flex-col items-center text-center">
-      <div className="w-24 sm:w-28">
-        
-        <img
-          src={item.thumb ?? FolderImg}
-          alt=""
-          className="w-full h-auto select-none"
-        />
-      </div>
-      <div className="mt-2 space-y-0.5">
-        <p className="text-sm font-medium text-stone-800">{item.title}</p>
-        <p className="text-xs text-stone-500">{item.desc}</p>
-      </div>
-    </li>
-  );
-}
-*/
 
 /**
  * RecordSlider: 가로 스크롤 슬라이더(카드들을 좌우로 넘겨봄)
@@ -250,7 +220,17 @@ export default function TasteList() {
           </div>
         </section>
 
-        {/* 2) 기록 슬라이더(좌우 넘김) + 우측 액션("기록 추가") */}
+        {/* 2) 작성 영역(인라인 모달 섹션) */}
+        <TasteRecordModal
+          open={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          // readonly 튜플 → 일반 string[]으로 복사해서 전달
+          categoryOptions={[...categoryOptions]}
+          tagOptions={[...tagOptions]}
+          onSaveSuccess={handleSaveSuccess} // ✅ 새 기록이 저장되면 리스트 상태에 바로 추가
+        />
+
+        {/* 3) 기록 슬라이더(좌우 넘김) + 우측 액션("기록 추가") */}
         <section className="pt-2 pb-8">
           <SectionTitle
             action={
@@ -280,16 +260,6 @@ export default function TasteList() {
             )}
           </div>
         </section>
-
-        {/* 3) 작성 모달: 열림 상태에 따라 표시, 더미 옵션 + 저장 성공 콜백 전달 */}
-        <TasteRecordModal
-          open={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          // readonly 튜플 → 일반 string[]으로 복사해서 전달
-          categoryOptions={[...categoryOptions]}
-          tagOptions={[...tagOptions]}
-          onSaveSuccess={handleSaveSuccess} // ✅ 새 기록이 저장되면 리스트 상태에 바로 추가
-        />
       </main>
     </>
   );
