@@ -25,6 +25,12 @@ import TasteList from "@/pages/TasteRecord/TasteList"; // 기록 목록(보호 �
 import TasteDetail from "@/pages/TasteRecord/TasteDetail"; // 기록 상세(보호 라우트 내부)
 import BeforeLogin from "@/pages/BeforeLogin/BeforeLogin"; // 로그인 전 랜딩 페이지
 import ProtectedRoute from "@/routes/ProtectedRoute"; // 로그인 필요 가드
+import GuildHome from "@/pages/Guild/GuildHome";
+import GuildManage from "@/pages/Guild/GuildManage";
+import GuildExplore from "@/pages/Guild/GuildExplore";
+import GuildDetail from "@/pages/Guild/GuildDetail";
+import GuildRoom from "@/pages/Guild/GuildRoom";
+import MyGuildPage from "@/pages/AfterLogin/MyGuild";
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error?: any }> {
   constructor(props: { children: React.ReactNode }) {
@@ -75,6 +81,12 @@ export default function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/취향기록" element={<TasteList />} />
               <Route path="/취향기록/:id" element={<TasteDetail />} />
+              <Route path="/guild" element={<GuildHome />} />
+              <Route path="/guild/explore" element={<GuildExplore />} />
+              <Route path="/guild/:guildId" element={<GuildDetail />} />
+              <Route path="/guild/:guildId/room" element={<GuildRoom />} />
+              <Route path="/guild/:guildId/manage" element={<GuildManage />} />
+              <Route path="/guild/my" element={<MyGuildPage />} />
             </Route>
 
             {/** 존재하지 않는 경로는 홈으로 보냄(필요시 별도 NotFound 페이지로 교체 가능) */}

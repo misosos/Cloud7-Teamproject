@@ -28,6 +28,7 @@
 // 이렇게 하면 **라우팅 구조를 한눈에 파악할 수 있고**, 기능별로 파일이 분리되어 관리가 쉽습니다.
 
 import { Router } from 'express';
+import guildRouter from './guild.routes';
 
 // ==============================================
 // 도메인(기능)별 하위 라우터 모음
@@ -103,4 +104,8 @@ router.use('/health', health);
 // 이렇게 하면 이 파일에서 정의한:
 //   - /auth/*, /health/*, (추후) /taste-records/*
 // 들이 모두 '/api' 접두사를 공유하게 됩니다.
+
+router.use('/guilds', guildRouter);
+
+
 export default router;

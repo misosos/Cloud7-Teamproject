@@ -3,6 +3,7 @@ import SignupModal from "@/components/SignupModal";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/store/authStore";
 
+
 /**
  * 헤더 내비게이션 컴포넌트
  * - 중앙에 메인 메뉴가 위치함
@@ -149,7 +150,7 @@ export default function HeaderNav({
                   <NavItem to="/취향기록">취향기록</NavItem>
                 </div>
                 <div className="group">
-                  <NavItem to="#">탐험가연맹</NavItem>
+                  <NavItem to="/guild">탐험가연맹</NavItem>
                 </div>
                 <div className="group">
                   <NavItem to="#">취향합치기</NavItem>
