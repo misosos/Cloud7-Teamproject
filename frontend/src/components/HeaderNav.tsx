@@ -152,12 +152,6 @@ export default function HeaderNav({
                 <div className="group">
                   <NavItem to="/guild">탐험가연맹</NavItem>
                 </div>
-                <div className="group">
-                  <NavItem to="#">취향합치기</NavItem>
-                </div>
-                <div className="group">
-                  <NavItem to="#">랜덤탐험미션</NavItem>
-                </div>
               </div>
             </div>
 

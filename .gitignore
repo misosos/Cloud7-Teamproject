@@ -57,3 +57,6 @@ coverage/
 
 **/prisma/*.db
 **/prisma/*.db-*
+# User uploaded files (do not commit)
+backend/uploads/
+uploads/

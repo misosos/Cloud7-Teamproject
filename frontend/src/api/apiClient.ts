@@ -227,6 +227,65 @@ export const httpDelete = <T>(
 ) => request<T>('DELETE', path, { ...(opt || {}), params });
 
 // --------------------------------------------------------------
+// 도메인 전용 API 헬퍼 (취향 추천 / 대시보드 등)
+//  - 컴포넌트에서 URL 문자열을 직접 쓰지 않고, 타입이 지정된 함수로 사용
+// --------------------------------------------------------------
+
+// 내 주변 취향 기반 장소 추천 결과 타입
+export interface TasteRecommendation {
+  id: number | string;
+  name: string;
+  address: string;
+  category: string;
+  distanceMeters: number;
+  lat: number;
+  lng: number;
+  score: number;
+}
+
+/**
+ * 내 취향 + 현재 좌표 기반 추천 장소 조회
+ *  - 백엔드: GET /places/recommend-by-taste?lat=..&lng=..
+ */
+export const getTasteBasedRecommendations = (
+  lat: number,
+  lng: number
+): Promise<TasteRecommendation[]> => {
+  return httpGet<TasteRecommendation[]>('/places/recommend-by-taste', {
+    lat,
+    lng,
+  });
+};
+
+// 취향 분석(대시보드) 응답 타입 예시
+export interface TasteRecordCategoryStat {
+  category: string;
+  count: number;
+  ratio: number; // 0~1 비율
+}
+
+export interface TasteRecordMonthlyStat {
+  month: string; // '2025-01' 같은 문자열
+  count: number;
+}
+
+export interface TasteRecordInsights {
+  totalCount: number;
+  activeDays: number;
+  longestStreak: number;
+  categoryStats: TasteRecordCategoryStat[];
+  monthlyStats: TasteRecordMonthlyStat[];
+}
+
+/**
+ * 취향 분석(인사이트) 데이터 조회
+ *  - 백엔드: GET /taste-records/insights
+ */
+export const getTasteRecordInsights = (): Promise<TasteRecordInsights> => {
+  return httpGet<TasteRecordInsights>('/taste-records/insights');
+};
+
+// --------------------------------------------------------------
 /** axios처럼 사용하는 얇은 어댑터 */
 const apiClient = {
   get: httpGet,

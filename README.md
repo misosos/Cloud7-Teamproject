@@ -38,6 +38,9 @@ npm i -D @types/express-session @types/cookie-parser
 npm i cors
 npm i -D @types/cors
 
+#axios 설치
+npm install axios
+
 # (선택) 보안/로그/속도제한
 npm i helmet morgan express-rate-limit
 ```

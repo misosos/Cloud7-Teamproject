@@ -29,6 +29,10 @@ model User {
 
   // 내가 가입한 길드 (Membership 기반)
   guildMemberships GuildMembership[]
+
+  // 위치 기반 기능
+  stays           Stay[]             // 유저가 머물렀던 장소들
+  recommendations Recommendation[]   // 유저에게 추천된 장소들
 }
 
 /**
@@ -41,13 +45,15 @@ model TasteRecord {
   userId Int
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  title    String
-  desc     String?
-  content  String?
-  category String
-  tagsJson String?
+  title      String
+  desc       String?   // 한 줄 설명 (프론트의 caption에 해당)
+  content    String?   // 상세 내용
+  recordedAt DateTime? // 사용자가 선택하는 날짜 (없으면 createdAt 기준으로 활용)
+  category   String
+  tagsJson   String?   // 태그 배열을 JSON 문자열로 저장
 
-  thumb     String?
+  thumb     String?    // 썸네일 이미지 URL (지금은 안 쓰면 null)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -102,11 +108,75 @@ model Guild {
   ownerId Int
   owner   User @relation(fields: [ownerId], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
   // Membership의 반대편 (중요!)
   memberships GuildMembership[]
 
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([createdAt])
+}
+
+/**
+ * ───────────────────────────────
+ * STAY (사용자가 머물렀던 장소)
+ * ────────────────────────────────
+ */
+model Stay {
+  id        Int      @id @default(autoincrement())
+
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+
+  lat       Float
+  lng       Float
+  startTime DateTime
+  endTime   DateTime
+
+  // 카카오 장소 + 카테고리 정보
+  kakaoPlaceId      String?
+  categoryName      String?
+  categoryGroupCode String?
+  mappedCategory    String?   // '영화' | '공연' | '전시' | '문화시설' | '관광명소' | '카페' | '식당' | '기타'
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, startTime])
+  @@index([userId, mappedCategory])
+
+  recommendations Recommendation[]
+}
+
+/**
+ * ───────────────────────────────
+ * RECOMMENDATION (장소 추천)
+ * ────────────────────────────────
+ */
+model Recommendation {
+  id        Int      @id @default(autoincrement())
+
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // stay는 옵션 (없어도 됨)
+  stayId    Int?
+  stay      Stay?    @relation(fields: [stayId], references: [id], onDelete: Cascade)
+
+  kakaoPlaceId      String
+  name              String
+  categoryName      String?
+  categoryGroupCode String?
+  mappedCategory    String   // '영화' | '공연' | ... | '식당'
+
+  x         Float
+  y         Float
+  score     Float
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 같은 유저가 같은 장소에 대한 추천이 stay 단위로 하나씩만 있게 하고 싶으면:
+  @@unique([userId, kakaoPlaceId, stayId])
+
+  @@index([userId, score])
 }
