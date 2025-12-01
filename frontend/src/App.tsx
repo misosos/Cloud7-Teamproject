@@ -25,6 +25,7 @@ import TasteList from "@/pages/TasteRecord/TasteList"; // 기록 목록(보호 �
 import TasteDetail from "@/pages/TasteRecord/TasteDetail"; // 기록 상세(보호 라우트 내부)
 import BeforeLogin from "@/pages/BeforeLogin/BeforeLogin"; // 로그인 전 랜딩 페이지
 import ProtectedRoute from "@/routes/ProtectedRoute"; // 로그인 필요 가드
+import AchievementDictionary from "@/components/AchievementDictionary/AchievementDictionary"; // 공식도감
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error?: any }> {
   constructor(props: { children: React.ReactNode }) {
@@ -67,6 +68,7 @@ export default function App() {
              *  - /dashboard        : 로그인 후 메인 화면
              *  - /취향기록        : 기록 목록(슬라이더/작성 모달 등)
              *  - /취향기록/:id    : 기록 상세(썸네일/설명/본문)
+             *  - /공식도감        : 업적 및 개인도전 화면 (공식도감)
              *  - 비로그인 접근 시 ProtectedRoute가 /before-login?next=... 로 보내고,
              *    로그인 성공 후 원래 가려던 경로(next)로 복귀합니다.
              */}
@@ -75,6 +77,7 @@ export default function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/취향기록" element={<TasteList />} />
               <Route path="/취향기록/:id" element={<TasteDetail />} />
+              <Route path="/공식도감" element={<AchievementDictionary />} />
             </Route>
 
             {/** 존재하지 않는 경로는 홈으로 보냄(필요시 별도 NotFound 페이지로 교체 가능) */}
