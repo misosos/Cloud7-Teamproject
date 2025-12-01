@@ -20,12 +20,18 @@
  */
 import React, { Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Dashboard from "@/pages/Dashboard/Dashboard";                      // 로그인 후 메인 화면
-import TasteList from "@/pages/TasteRecord/TasteList";                    // 기록 목록
-import TasteDetail from "@/pages/TasteRecord/TasteDetail";                // 기록 상세
+import Dashboard from "@/pages/Dashboard/Dashboard"; // 로그인 후 메인 화면
+import TasteList from "@/pages/TasteRecord/TasteList"; // 기록 목록(보호 라우트 내부)
+import TasteDetail from "@/pages/TasteRecord/TasteDetail"; // 기록 상세(보호 라우트 내부)
+import BeforeLogin from "@/pages/BeforeLogin/BeforeLogin"; // 로그인 전 랜딩 페이지
+import ProtectedRoute from "@/routes/ProtectedRoute"; // 로그인 필요 가드
+import GuildHome from "@/pages/Guild/GuildHome";
+import GuildManage from "@/pages/Guild/GuildManage";
+import GuildExplore from "@/pages/Guild/GuildExplore";
+import GuildDetail from "@/pages/Guild/GuildDetail";
+import GuildRoom from "@/pages/Guild/GuildRoom";
+import MyGuildPage from "@/pages/Dashboard/MyGuild";
 import NearbyTasteRecommendations from "@/components/NearbyPlaceSection"; // ✅ 내 주변 취향저격 추천
-import BeforeLogin from "@/pages/BeforeLogin/BeforeLogin";                // 로그인 전 랜딩 페이지
-import ProtectedRoute from "@/routes/ProtectedRoute";                     // 로그인 필요 가드
 import MapPage from "@/pages/Map/MapPage";                                // 카카오맵 테스트 페이지(디버깅용)
 
 class ErrorBoundary extends React.Component<
@@ -85,6 +91,12 @@ export default function App() {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/취향기록" element={<TasteList />} />
               <Route path="/취향기록/:id" element={<TasteDetail />} />
+              <Route path="/guild" element={<GuildHome />} />
+              <Route path="/guild/explore" element={<GuildExplore />} />
+              <Route path="/guild/:guildId" element={<GuildDetail />} />
+              <Route path="/guild/:guildId/room" element={<GuildRoom />} />
+              <Route path="/guild/:guildId/manage" element={<GuildManage />} />
+              <Route path="/guild/my" element={<MyGuildPage />} />
               <Route path="/nearby" element={<NearbyTasteRecommendations />} /> {/* ✅ 내 주변 놀거리 추천 (취향 기반) */}
               <Route path="/map" element={<MapPage />} />                         {/* 디버깅용 */}
             </Route>
