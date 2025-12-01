@@ -1,95 +1,96 @@
-datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
-}
+  datasource db {
+    provider = "sqlite"
+    url      = env("DATABASE_URL")
+  }
 
-generator client {
-  provider = "prisma-client-js"
-}
+  generator client {
+    provider = "prisma-client-js"
+  }
 
-model User {
-  id           Int      @id @default(autoincrement())
-  email        String   @unique
-  name         String? // 선택
-  passwordHash String // 해시만 저장
-  role         String? // 선택
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  model User {
+    id           Int      @id @default(autoincrement())
+    email        String   @unique
+    name         String? // 선택
+    passwordHash String // 해시만 저장
+    role         String? // 선택
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
 
-  tasteRecords TasteRecord[]
-  stays        Stay[] // 유저가 머물렀던 장소들
-  recommendations Recommendation[]
-}
+    tasteRecords TasteRecord[]
+    stays        Stay[] // 유저가 머물렀던 장소들
+    recommendations Recommendation[]
+  }
 
-model TasteRecord {
-  id     String @id @default(cuid())
-  userId Int
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  model TasteRecord {
+    id     String @id @default(cuid())
+    userId Int
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  title      String
-  desc       String? // 한 줄 설명 (프론트의 caption에 해당)
-  content    String? // 상세 내용
-  recordedAt DateTime? // 사용자가 선택하는 날짜 (없으면 createdAt 기준으로 활용)
-  category   String
-  tagsJson   String? // 태그 배열을 JSON 문자열로 저장 (DB 종류와 상관없이 쓰기 쉽게)
+    title      String
+    desc       String? // 한 줄 설명 (프론트의 caption에 해당)
+    content    String? // 상세 내용
+    recordedAt DateTime? // 사용자가 선택하는 날짜 (없으면 createdAt 기준으로 활용)
+    category   String
+    tagsJson   String? // 태그 배열을 JSON 문자열로 저장 (DB 종류와 상관없이 쓰기 쉽게)
 
-  thumb     String? // 썸네일 이미지 URL (지금은 안 쓰면 null)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+    thumb     String? // 썸네일 이미지 URL (지금은 안 쓰면 null)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
 
-  @@index([userId, createdAt])
-}
+    @@index([userId, createdAt])
+    @@unique([userId, category])
+  }
 
-model Stay {
-  id        Int      @id @default(autoincrement())
+  model Stay {
+    id        Int      @id @default(autoincrement())
 
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id])
+    userId    Int
+    user      User     @relation(fields: [userId], references: [id])
 
-  lat       Float
-  lng       Float
-  startTime DateTime
-  endTime   DateTime
+    lat       Float
+    lng       Float
+    startTime DateTime
+    endTime   DateTime
 
-  // 🔽 카카오 장소 + 카테고리 정보
-  kakaoPlaceId      String?   // Kakao place_id
-  categoryName      String?   // "문화시설 > 극장 > 영화관" 이런 원본 문자열
-  categoryGroupCode String?   // CT1 / AT4 / CE7 / FD6 ...
-  mappedCategory    String?   // '영화' | '공연' | '전시' | '문화시설' | '관광명소' | '카페' | '식당' | '기타'
+    // 🔽 카카오 장소 + 카테고리 정보
+    kakaoPlaceId      String?   // Kakao place_id
+    categoryName      String?   // "문화시설 > 극장 > 영화관" 이런 원본 문자열
+    categoryGroupCode String?   // CT1 / AT4 / CE7 / FD6 ...
+    mappedCategory    String?   // '영화' | '공연' | '전시' | '문화시설' | '관광명소' | '카페' | '식당' | '기타'
 
-  createdAt DateTime @default(now())
+    createdAt DateTime @default(now())
 
-  @@index([userId, startTime])
-  @@index([userId, mappedCategory])
+    @@index([userId, startTime])
+    @@index([userId, mappedCategory])
 
-  recommendations Recommendation[]
-}
+    recommendations Recommendation[]
+  }
 
-model Recommendation {
-  id        Int      @id @default(autoincrement())
+  model Recommendation {
+    id        Int      @id @default(autoincrement())
 
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    userId    Int
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // stay는 옵션으로(없어도 됨)
-  stayId    Int?
-  stay      Stay?    @relation(fields: [stayId], references: [id], onDelete: Cascade)
+    // stay는 옵션으로(없어도 됨)
+    stayId    Int?
+    stay      Stay?    @relation(fields: [stayId], references: [id], onDelete: Cascade)
 
-  kakaoPlaceId      String
-  name              String
-  categoryName      String?
-  categoryGroupCode String?
-  mappedCategory    String   // '영화' | '공연' | ... | '식당'
+    kakaoPlaceId      String
+    name              String
+    categoryName      String?
+    categoryGroupCode String?
+    mappedCategory    String   // '영화' | '공연' | ... | '식당'
 
-  x         Float
-  y         Float
-  score     Float
+    x         Float
+    y         Float
+    score     Float
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
 
-  // 같은 유저가 같은 장소에 대한 추천이 stay 단위로 하나씩만 있게 하고 싶으면:
-  @@unique([userId, kakaoPlaceId, stayId])
+    // 같은 유저가 같은 장소에 대한 추천이 stay 단위로 하나씩만 있게 하고 싶으면:
+    @@unique([userId, kakaoPlaceId, stayId])
 
-  @@index([userId, score])
-}
+    @@index([userId, score])
+  }

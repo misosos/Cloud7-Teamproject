@@ -3,7 +3,7 @@ import express, { Request, Response } from 'express';
 import axios from 'axios';
 import authRequired from '../middlewares/authRequired';
 import type { AuthedRequest } from '../middlewares/authRequired';
-import { getPlacesRecommendedByTaste } from '../services/recommendation.service';
+import prisma from '../lib/prisma';
 
 const router = express.Router();
 
@@ -168,8 +168,9 @@ async function fetchPlacesByGroupCode(
 
 /**
  * GET /api/places
+ * 주변 장소 조회 + 유저 취향 weight 반영 정렬 처리
  */
-router.get('/', async (req, res) => {
+router.get('/', authRequired, async (req: AuthedRequest, res) => {
   try {
     const { x, y, radius } = req.query;
 
@@ -180,11 +181,69 @@ router.get('/', async (req, res) => {
       });
     }
 
+    const lng = Number(x);
+    const lat = Number(y);
+
     const radiusStr =
       typeof radius === 'string' && radius.trim() !== ''
         ? radius.trim()
         : '2000';
 
+    if (Number.isNaN(lat) || Number.isNaN(lng)) {
+      return res.status(400).json({
+        ok: false,
+        error: 'x, y는 숫자여야 합니다.',
+      });
+    }
+
+    // ---------------------------
+    // 1) 유저 취향 weight 계산
+    // ---------------------------
+
+    const grouped = await prisma.stay.groupBy({
+      by: ['mappedCategory'],
+      where: {
+        userId: req.currentUser!.id,
+        mappedCategory: { not: null },
+      },
+      _count: { _all: true },
+    });
+
+    const totalCount = grouped.reduce((s, g) => s + g._count._all, 0);
+
+    const defaultCats: MappedCategory[] = [
+      '영화', '공연', '전시', '문화시설', '관광명소', '카페', '식당'
+    ];
+
+    const weights: Record<MappedCategory, number> = {
+      영화: 0,
+      공연: 0,
+      전시: 0,
+      문화시설: 0,
+      관광명소: 0,
+      카페: 0,
+      식당: 0,
+      기타: 0,
+    };
+
+    let hasTaste = totalCount > 0;
+
+    if (!hasTaste) {
+      // 취향 없음 → 전체 7카테고리 동일 weight
+      const equal = 1 / defaultCats.length;
+      defaultCats.forEach(c => weights[c] = equal);
+    } else {
+      // 취향 있음 → 비율로 계산
+      defaultCats.forEach((cat) => {
+        const row = grouped.find((g) => g.mappedCategory === cat);
+        const count = row?._count._all ?? 0;
+        weights[cat] = count / totalCount;
+      });
+    }
+
+    // ---------------------------
+    // 2) 카카오 장소 가져오기
+    // ---------------------------
     const results = await Promise.all(
       FUN_CATEGORY_GROUPS.map((code) =>
         fetchPlacesByGroupCode({
@@ -203,11 +262,28 @@ router.get('/', async (req, res) => {
 
     const places = Array.from(mergedMap.values());
 
+    // ---------------------------
+    // 3) 취향 기반 score 정렬
+    // ---------------------------
+    const scored = places
+      .map((p) => {
+        const w = weights[p.mappedCategory] ?? 0;
+
+        // 단순한 weight → score
+        return {
+          ...p,
+          score: w,
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+
     return res.json({
       ok: true,
-      count: places.length,
-      places,
+      hasTasteData: hasTaste,
+      count: scored.length,
+      places: scored,
     });
+
   } catch (error) {
     console.error('[GET /api/places] Error:', error);
 
@@ -218,69 +294,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-/**
- * GET /api/places/recommend-by-taste
- * 내 취향 분석(카테고리 비율) + 현재 위치 기반 추천 장소
- */
-router.get(
-  '/recommend-by-taste',
-  authRequired,
-  async (req: Request, res: Response) => {
-    try {
-      // ✅ authRequired를 지난 뒤에는 currentUser가 설정되어 있다고 가정
-      const { currentUser } = req as AuthedRequest;
 
-      if (!currentUser) {
-        return res.status(401).json({
-          ok: false,
-          error: '로그인이 필요합니다.',
-        });
-      }
-
-      const { x, y, radius } = req.query;
-
-      if (!x || !y) {
-        return res.status(400).json({
-          ok: false,
-          error: 'x(경도)와 y(위도)는 필수입니다.',
-        });
-      }
-
-      const lng = Number(x);
-      const lat = Number(y);
-      const radiusNum =
-        typeof radius === 'string' && radius.trim() !== ''
-          ? Number(radius)
-          : 2000;
-
-      if (Number.isNaN(lat) || Number.isNaN(lng)) {
-        return res.status(400).json({
-          ok: false,
-          error: 'x, y는 숫자여야 합니다.',
-        });
-      }
-
-      const places = await getPlacesRecommendedByTaste(
-        currentUser.id,
-        lat,
-        lng,
-        radiusNum,
-      );
-
-      return res.json({
-        ok: true,
-        count: places.length,
-        places,
-      });
-    } catch (error) {
-      console.error('[GET /api/places/recommend-by-taste] Error:', error);
-      return res.status(500).json({
-        ok: false,
-        error: '취향 기반 추천 조회 중 오류가 발생했습니다.',
-      });
-    }
-  },
-);
 
 /**
  * ⭐ POST /api/places/optimize

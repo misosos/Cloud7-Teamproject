@@ -50,7 +50,7 @@ export default function RecordGallery() {
 
       try {
         // ▸ withCredentials/쿠키 포함 설정은 apiClient 내부에서 처리된다고 가정
-        const res = await httpGet<TasteRecordListResponse>("/taste-records");
+        const res = await httpGet<TasteRecordListResponse>("/taste-records/dashboard");
 
         if (!res.ok) {
           throw new Error("기록 목록 조회 실패");
