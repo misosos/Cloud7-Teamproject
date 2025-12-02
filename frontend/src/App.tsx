@@ -20,6 +20,7 @@
  */
 import React, { Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useLiveLocationTracker } from "./hooks/useLiveLocationTracker";
 import Dashboard from "@/pages/Dashboard/Dashboard"; // 로그인 후 메인 화면
 import TasteList from "@/pages/TasteRecord/TasteList"; // 기록 목록(보호 라우트 내부)
 import TasteDetail from "@/pages/TasteRecord/TasteDetail"; // 기록 상세(보호 라우트 내부)
@@ -66,6 +67,10 @@ class ErrorBoundary extends React.Component<
  * - 보호가 필요한 경로는 <ProtectedRoute> 안쪽에 둡니다.
  */
 export default function App() {
+  useLiveLocationTracker({
+    enabled: true,
+    intervalMs: 15_000, // 15초마다 최소 한 번
+  });
   return (
     <ErrorBoundary>
       <BrowserRouter>
