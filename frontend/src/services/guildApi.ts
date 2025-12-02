@@ -21,6 +21,7 @@ export type GuildListItem = {
   currentMembers: number;
   maxMembers: number;
   status: GuildStatus;
+  ownerId: number;
 };
 
 /** 상세 화면용 길드 기본 정보 */
@@ -30,6 +31,8 @@ export type GuildBasic = {
   description: string;
   intro: string;
   rules: string;
+  emblemUrl: string | null;
+  ownerId: number;
   stats: {
     totalDex: number;
     thisMonthDex: number;
@@ -108,6 +111,7 @@ export async function fetchGuildList(): Promise<GuildListItem[]> {
     // 일단 최대 인원은 임시 값 
     maxMembers: g.maxMembers ?? 20,
     status: "모집 중",
+    ownerId: g.ownerId,
   }));
 }
 
@@ -148,6 +152,8 @@ export async function fetchGuildDetail(
         description: guildData.description || "",
         intro: guildData.description || "연맹 소개가 없습니다.",
         rules: guildData.rules || "연맹 규칙이 설정되지 않았습니다.",
+        emblemUrl: guildData.emblemUrl || null,
+        ownerId: guildData.ownerId,
         stats: {
           totalDex: 0,
           thisMonthDex: 0,

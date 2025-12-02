@@ -10,6 +10,7 @@ import {
   leaveGuildForUser,
   getPendingMemberships,
   processMembershipRequest,
+  updateGuild,
   disbandGuild,
   getGuildMembers,
   getGuildRanking,
@@ -522,6 +523,65 @@ router.post(
             ok: false,
             error: "NOT_FOUND",
             message: "가입 신청을 찾을 수 없습니다.",
+          });
+        }
+      }
+      next(err);
+    }
+  },
+);
+
+/**
+ * PATCH
+ * 연맹 업데이트 (연맹장만 가능)
+ */
+router.patch(
+  "/:id",
+  authRequired,
+  async (req: AuthedRequest, res: Response, next: NextFunction) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({
+          ok: false,
+          error: "UNAUTHORIZED",
+          message: "로그인이 필요합니다.",
+        });
+      }
+
+      const guildId = Number(req.params.id);
+      if (!guildId || Number.isNaN(guildId)) {
+        return res.status(400).json({
+          ok: false,
+          error: "BAD_REQUEST",
+          message: "id 파라미터가 올바르지 않습니다.",
+        });
+      }
+
+      const { emblemUrl } = req.body as {
+        emblemUrl?: string;
+      };
+
+      const data = await updateGuild(guildId, userId, {
+        emblemUrl,
+      });
+
+      return res.json({ ok: true, data });
+    } catch (err: any) {
+      if (err instanceof Error) {
+        const code = (err as any).code;
+        if (code === "GUILD_NOT_FOUND") {
+          return res.status(404).json({
+            ok: false,
+            error: "NOT_FOUND",
+            message: "연맹을 찾을 수 없습니다.",
+          });
+        }
+        if (code === "NOT_OWNER") {
+          return res.status(403).json({
+            ok: false,
+            error: "FORBIDDEN",
+            message: "연맹장만 연맹 정보를 수정할 수 있습니다.",
           });
         }
       }

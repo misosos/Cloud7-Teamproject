@@ -78,10 +78,11 @@ export async function createGuild(
 /**  길드 가입 */
 export async function joinGuildBackend(
   guildId: number | string,
+  message?: string,
 ): Promise<void> {
   const res = await apiClient.post<ApiEnvelope<unknown>>(
     `/guilds/${guildId}/join`,
-    {},
+    message ? { message } : {},
   );
   if (!res.ok) {
     throw new Error("길드 가입에 실패했습니다.");
@@ -174,6 +175,7 @@ export type PendingMembership = {
   userId: number;
   userName: string | null;
   userEmail: string;
+  message: string | null;
   createdAt: string;
 };
 
@@ -217,6 +219,27 @@ export async function rejectMembership(
   if (!res.ok) {
     throw new Error("가입 신청 거절에 실패했습니다.");
   }
+}
+
+/** 연맹 업데이트 payload 타입 */
+export type UpdateGuildPayload = {
+  emblemUrl?: string;
+};
+
+/** 연맹 업데이트 (연맹장만 가능) */
+export async function updateGuild(
+  guildId: number | string,
+  payload: UpdateGuildPayload,
+): Promise<GuildDTO> {
+  const res = await apiClient.patch<ApiEnvelope<GuildDTO>>(
+    `/guilds/${guildId}`,
+    payload,
+  );
+  if (!res.ok) {
+    const errorMessage = (res as any).message || (res as any).error || "연맹 업데이트에 실패했습니다.";
+    throw new Error(errorMessage);
+  }
+  return res.data;
 }
 
 /** 연맹 해체 */
