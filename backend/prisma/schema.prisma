@@ -33,6 +33,7 @@ model User {
   // 위치 기반 기능
   stays           Stay[]             // 유저가 머물렀던 장소들
   recommendations Recommendation[]   // 유저에게 추천된 장소들
+  liveLocation     LiveLocation?
 }
 
 /**
@@ -115,6 +116,8 @@ model Guild {
   updatedAt DateTime @updatedAt
 
   @@index([createdAt])
+
+  recommendations Recommendation[]
 }
 
 /**
@@ -143,8 +146,6 @@ model Stay {
 
   @@index([userId, startTime])
   @@index([userId, mappedCategory])
-
-  recommendations Recommendation[]
 }
 
 /**
@@ -153,30 +154,52 @@ model Stay {
  * ────────────────────────────────
  */
 model Recommendation {
-  id        Int      @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
 
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // 개인 추천
+  user        User?    @relation(fields: [userId], references: [id])
+  userId      Int?
 
-  // stay는 옵션 (없어도 됨)
-  stayId    Int?
-  stay      Stay?    @relation(fields: [stayId], references: [id], onDelete: Cascade)
+  // 연맹 추천
+  guild       Guild?   @relation(fields: [guildId], references: [id])
+  guildId     Int?
+
+  // PERSONAL | GUILD
+  source      String   // enum으로 만들어도 됨
 
   kakaoPlaceId      String
   name              String
-  categoryName      String?
-  categoryGroupCode String?
-  mappedCategory    String   // '영화' | '공연' | ... | '식당'
+  categoryName      String
+  categoryGroupCode String
+  mappedCategory    String     // "영화" | "공연" | ...
+  lat               Float
+  lng               Float
+  roadAddress       String?
+  address           String?
+  phone             String?
 
-  x         Float
-  y         Float
-  score     Float
+  status      String   @default("PENDING") // PENDING | VISITED
+  reason      String?  // "내 취향 TOP3" / "연맹원 평균 취향 기반" 등
+  createdAt   DateTime @default(now())
+  visitedAt   DateTime?
+}
 
-  createdAt DateTime @default(now())
+
+/**
+ * ───────────────────────────────
+ * LIVE LOCATION (유저 실시간 위치)
+ * ────────────────────────────────
+ */
+model LiveLocation {
+  id      Int   @id @default(autoincrement())
+
+  userId  Int   @unique
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  lat     Float
+  lng     Float
+
   updatedAt DateTime @updatedAt
 
-  // 같은 유저가 같은 장소에 대한 추천이 stay 단위로 하나씩만 있게 하고 싶으면:
-  @@unique([userId, kakaoPlaceId, stayId])
-
-  @@index([userId, score])
+  @@index([updatedAt])
 }

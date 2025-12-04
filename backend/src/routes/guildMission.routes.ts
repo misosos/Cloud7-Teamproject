@@ -1,3 +1,4 @@
+/// <reference path="../types/session.d.ts" />
 // src/routes/guild.routes.ts
 import { Router, Request, Response } from "express";
 import authRequired from "../middlewares/authRequired";
@@ -6,7 +7,7 @@ import prisma from "../lib/prisma";
 const router = Router();
 
 // 우리가 추적하는 취향 카테고리
-const TRACKED_CATEGORIES = [
+const TRACKED_CATEGORIES  = [ 
   "영화",
   "공연",
   "전시",
@@ -94,8 +95,12 @@ function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number) 
 /**
  * ✅ GET /api/guilds/nearby-context
  * - 현재 유저와 같은 길드에 속한 멤버 중
- *   반경 500m 이내에 있는 멤버들 + 그 멤버들의 "공동 취향" 기반 추천 장소
- * query: radiusMembers?(기본 500), radiusPlaces?(기본 3000)
+ *   반경 radiusMembers(기본 500m) 이내에 있는 멤버들 + 그 멤버들의 "공동 취향" 기반 추천 장소
+ *
+ * query:
+ *   - lat, lng (선택)  ➜ 없으면 LiveLocation 기준
+ *   - radiusMembers?  (기본 500)
+ *   - radiusPlaces?   (기본 3000)
  */
 router.get(
   "/nearby-context",
@@ -103,19 +108,6 @@ router.get(
   async (req: Request, res: Response) => {
     try {
       const userId = req.currentUser!.id;
-
-      // 1) 내 현재 위치
-      const meLocation = await prisma.liveLocation.findUnique({
-        where: { userId },
-      });
-
-      if (!meLocation) {
-        return res.status(400).json({
-          ok: false,
-          error: "NO_LOCATION",
-          message: "현재 위치가 등록되어 있지 않습니다. /api/location/update 먼저 호출",
-        });
-      }
 
       const radiusMembers =
         typeof req.query.radiusMembers === "string"
@@ -127,25 +119,67 @@ router.get(
           ? Number(req.query.radiusPlaces)
           : 3000;
 
-      // 2) 내가 속한 길드 찾기 (일단 첫번째 길드 기준)
+      // 1) 내가 속한 길드 찾기 (일단 첫번째 길드 기준)
       const myMemberships = await prisma.guildMembership.findMany({
         where: { userId, status: "APPROVED" },
         include: { guild: true },
       });
 
       if (myMemberships.length === 0) {
+        // 길드가 없으면 그냥 빈 결과
         return res.json({
           ok: true,
           guild: null,
+          center: null,
           members: [],
           hasTasteData: false,
           places: [],
+          warning: "NO_GUILD",
         });
       }
 
       const guild = myMemberships[0].guild;
 
-      // 3) 같은 길드의 다른 멤버들
+      // 2) 중심 좌표 결정: (1) 쿼리 lat/lng → (2) 내 LiveLocation
+      const qLat = typeof req.query.lat === "string" ? Number(req.query.lat) : null;
+      const qLng = typeof req.query.lng === "string" ? Number(req.query.lng) : null;
+
+      let centerLat: number | null = null;
+      let centerLng: number | null = null;
+
+      if (
+        qLat != null &&
+        !Number.isNaN(qLat) &&
+        qLng != null &&
+        !Number.isNaN(qLng)
+      ) {
+        centerLat = qLat;
+        centerLng = qLng;
+      } else {
+        const meLocation = await prisma.liveLocation.findUnique({
+          where: { userId },
+        });
+
+        if (meLocation) {
+          centerLat = meLocation.lat;
+          centerLng = meLocation.lng;
+        }
+      }
+
+      // 위치 정보가 전혀 없으면 ➜ 400이 아니라, 길드 정보만 + 빈 리스트
+      if (centerLat == null || centerLng == null) {
+        return res.json({
+          ok: true,
+          guild: { id: guild.id, name: guild.name },
+          center: null,
+          members: [],
+          hasTasteData: false,
+          places: [],
+          warning: "NO_LOCATION",
+        });
+      }
+
+      // 3) 같은 길드의 멤버들
       const memberships = await prisma.guildMembership.findMany({
         where: {
           guildId: guild.id,
@@ -168,8 +202,8 @@ router.get(
       const nearbyMembers = locations
         .map((loc) => {
           const dist = distanceMeters(
-            meLocation.lat,
-            meLocation.lng,
+            centerLat!,
+            centerLng!,
             loc.lat,
             loc.lng,
           );
@@ -184,24 +218,18 @@ router.get(
         .filter((m) => m.distanceMeters <= radiusMembers);
 
       if (nearbyMembers.length === 0) {
+        // 주변에 함께 있는 길드원이 없으면 ➜ 공동 추천은 없음
         return res.json({
           ok: true,
           guild: { id: guild.id, name: guild.name },
+          center: { lat: centerLat, lng: centerLng },
           members: [],
           hasTasteData: false,
           places: [],
         });
       }
 
-      // 6) 연맹원들의 위치 중앙값(단순 평균) 계산
-      const allLat = nearbyMembers.map((m) => m.lat);
-      const allLng = nearbyMembers.map((m) => m.lng);
-      const centerLat =
-        allLat.reduce((s, v) => s + v, 0) / nearbyMembers.length;
-      const centerLng =
-        allLng.reduce((s, v) => s + v, 0) / nearbyMembers.length;
-
-      // 7) 연맹원들의 Stay 기반 카테고리 weight (합산/공동 취향)
+      // 6) 연맹원들의 Stay 기반 카테고리 weight (합산/공동 취향)
       const staysGrouped = await prisma.stay.groupBy({
         by: ["mappedCategory"],
         where: {
@@ -237,7 +265,7 @@ router.get(
         });
       }
 
-      // 8) 중심점 기준 3000m 내 카카오 장소 긁어오기
+      // 7) 중심점 기준 radiusPlaces 내 카카오 장소 긁어오기
       if (!KAKAO_REST_API_KEY) {
         console.warn("[Guild] KAKAO_REST_API_KEY not set");
       }
@@ -274,7 +302,7 @@ router.get(
       allPlaces.forEach((p) => dedup.set(p.id, p));
       const uniquePlaces = Array.from(dedup.values());
 
-      // 9) 연맹원 공동 취향 weight로 점수 계산 + 정렬
+      // 8) 연맹원 공동 취향 weight로 점수 계산 + 정렬
       const scored = uniquePlaces
         .map((p) => {
           if (!p.mappedCategory) return null;
@@ -285,7 +313,9 @@ router.get(
             score: w,
           };
         })
-        .filter((p): p is ReturnType<typeof toPlaceDTO> & { score: number } => !!p)
+        .filter(
+          (p): p is ReturnType<typeof toPlaceDTO> & { score: number } => !!p,
+        )
         .sort((a, b) => b.score - a.score);
 
       return res.json({

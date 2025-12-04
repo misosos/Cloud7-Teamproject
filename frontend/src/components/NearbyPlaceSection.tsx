@@ -17,20 +17,50 @@ const NearbyPlaceSection: React.FC = () => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const { latitude, longitude } = pos.coords;
+        console.log(
+          "[NearbyPlaceSection] 위치 가져오기 성공:",
+          latitude,
+          longitude,
+        );
         setLat(latitude);
         setLng(longitude);
         setLocLoading(false);
       },
       (err) => {
-        console.error("[NearbyTasteSection] 위치 가져오기 실패", err);
-        setLocError("현재 위치를 가져올 수 없어요. 위치 권한을 확인해 주세요.");
+        console.error(
+          "[NearbyPlaceSection] 위치 가져오기 실패",
+          err,
+          "code:",
+          err.code,
+          "message:",
+          err.message,
+        );
+
+        // code === 1: PERMISSION_DENIED
+        // code === 2: POSITION_UNAVAILABLE
+        // code === 3: TIMEOUT
+        if (err.code === 1) {
+          setLocError(
+            "위치 권한이 거부되어 있어요. 브라우저/앱 설정에서 위치 권한을 허용해 주세요.",
+          );
+        } else if (err.code === 3) {
+          setLocError(
+            "위치 응답이 늦어져서 가져오지 못했어요. 잠시 후 다시 시도해 주세요.",
+          );
+        } else {
+          setLocError("현재 위치를 가져올 수 없어요. 네트워크와 위치 설정을 확인해 주세요.");
+        }
+
         setLocLoading(false);
       },
       {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
+        // 너무 빡세게 요구하면 PC/네트워크 환경에서 타임아웃 잘 남
+        enableHighAccuracy: false,
+        // 20초까지 기다려 줌
+        timeout: 20_000,
+        // 최근 1분 이내 위치가 있으면 그걸 재사용 (0이면 무조건 새로 측위)
+        maximumAge: 60_000,
+      },
     );
   }, []);
 
