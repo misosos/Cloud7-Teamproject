@@ -20,6 +20,7 @@
  */
 import React, { Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
 import Dashboard from "@/pages/Dashboard/Dashboard"; // 로그인 후 메인 화면
 import TasteList from "@/pages/TasteRecord/TasteList"; // 기록 목록(보호 라우트 내부)
 import TasteDetail from "@/pages/TasteRecord/TasteDetail"; // 기록 상세(보호 라우트 내부)
@@ -69,6 +70,31 @@ export default function App() {
   return (
     <ErrorBoundary>
       <BrowserRouter>
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            duration: 3000,
+            style: {
+              background: '#f4f0ea',
+              color: '#6b4321',
+              border: '2px solid #c3a47a',
+              borderRadius: '16px',
+              padding: '18px 24px',
+              fontSize: '18px',
+              fontWeight: '600',
+              minWidth: '320px',
+            },
+            success: {
+              iconTheme: {
+                primary: '#6b4321',
+                secondary: '#f4f0ea',
+              },
+              style: {
+                fontSize: '18px',
+              },
+            },
+          }}
+        />
         <Suspense fallback={<div style={{ padding: 24 }}>화면을 불러오고 있어요…</div>}>
           <Routes>
             {/*
