@@ -519,6 +519,40 @@ export async function getGuildRanking(
 }
 
 /**
+ * 연맹 업데이트 (연맹장만 가능)
+ * emblemUrl 등 연맹 정보를 업데이트
+ */
+export async function updateGuild(
+  guildId: number,
+  ownerId: number,
+  payload: {
+    emblemUrl?: string;
+  },
+): Promise<GuildDTO> {
+  const guild = await prisma.guild.findUnique({ where: { id: guildId } });
+  if (!guild) {
+    const err = new Error("GUILD_NOT_FOUND");
+    (err as any).code = "GUILD_NOT_FOUND";
+    throw err;
+  }
+
+  if (guild.ownerId !== ownerId) {
+    const err = new Error("NOT_OWNER");
+    (err as any).code = "NOT_OWNER";
+    throw err;
+  }
+
+  const updated = await prisma.guild.update({
+    where: { id: guildId },
+    data: {
+      emblemUrl: payload.emblemUrl !== undefined ? payload.emblemUrl : undefined,
+    },
+  });
+
+  return serializeGuild(updated);
+}
+
+/**
  * 연맹 해체 (연맹장만 가능)
  * 연맹과 모든 멤버십을 삭제
  */
