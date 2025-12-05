@@ -31,6 +31,7 @@ export default function HeaderNav({
   // 인증 모달
   const [open, setOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // ----- 전역 Auth 스토어 연동 -----
   // 세션 사용자 (session?.user | user 어느 쪽이든 대응)
@@ -111,6 +112,8 @@ export default function HeaderNav({
     if (location.pathname === "/" || location.pathname.startsWith("/before-login")) {
       navigate("/dashboard", { replace: true });
     }
+    // 로그인 성공 시 모바일 네비도 닫기
+    setMobileNavOpen(false);
   }, [user, location.pathname, navigate]);
 
   // 로그아웃(세션 만료 포함) 후 보호 페이지에 남아있는 케이스 방지
@@ -119,6 +122,7 @@ export default function HeaderNav({
     // 프로젝트 보호 경로들 필요 시 추가
     const needAuth = ["/dashboard", "/취향기록"];
     if (needAuth.some((p) => location.pathname.startsWith(p))) {
+      setMobileNavOpen(false);
       navigate("/before-login", { replace: true });
     }
   }, [user, location.pathname, navigate]);
@@ -128,14 +132,16 @@ export default function HeaderNav({
       {/* 헤더 바 */}
       <header className="sticky top-0 z-30 mb-6 md:mb-8">
         <nav className="bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60 border-b border-stone-200/70 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-          <div className="mx-auto max-w-6xl px-5 h-14 md:h-16 flex items-center gap-4">
+          <div className="mx-auto max-w-6xl px-5 h-14 md:h-16 flex items-center gap-3">
             {/* 좌측 로고 */}
             {lockLogo ? (
               <span
                 className="flex items-center gap-2 min-w-0 select-none cursor-not-allowed"
                 title="로그인 후 이용 가능합니다"
               >
-                <span className="text-[15px] md:text-[16px] font-semibold tracking-tight text-stone-900">취향도감</span>
+                <span className="text-[15px] md:text-[16px] font-semibold tracking-tight text-stone-900">
+                  취향도감
+                </span>
               </span>
             ) : (
               <Link to={user ? "/dashboard" : "/"} className="flex items-center gap-2 min-w-0">
@@ -143,7 +149,7 @@ export default function HeaderNav({
               </Link>
             )}
 
-            {/* 중앙 네비 */}
+            {/* 중앙 네비 (데스크톱) */}
             <div className={`hidden md:flex flex-1 justify-center ${lockNav ? "opacity-60" : ""}`}>
               <div className="flex items-center gap-8">
                 <div className="group">
@@ -155,8 +161,8 @@ export default function HeaderNav({
               </div>
             </div>
 
-            {/* 우측 로그인/로그아웃 영역 */}
-            <div className="ml-auto flex items-center gap-3">
+            {/* 우측 로그인/로그아웃 영역 + 모바일 메뉴 버튼 */}
+            <div className="ml-auto flex items-center gap-2 md:gap-3">
               {user ? (
                 <>
                   <span
@@ -167,7 +173,7 @@ export default function HeaderNav({
                   </span>
                   <button
                     onClick={handleLogout}
-                    className="inline-flex items-center text-sm px-3 py-1.5 rounded-md ring-1 ring-stone-300 text-stone-700 hover:bg-stone-100 transition"
+                    className="hidden md:inline-flex items-center text-sm px-3 py-1.5 rounded-md ring-1 ring-stone-300 text-stone-700 hover:bg-stone-100 transition"
                   >
                     로그아웃
                   </button>
@@ -177,7 +183,7 @@ export default function HeaderNav({
                   {authButtons === "none" ? null : authButtons === "loginOnly" ? (
                     <button
                       onClick={openLogin}
-                      className="inline-flex items-center gap-1 text-sm px-3.5 py-1.5 rounded-md bg-amber-800 text-amber-50 hover:bg-amber-900 active:scale-[0.99] shadow-[0_6px_14px_rgba(90,50,0,0.18)] ring-1 ring-amber-900/30 transition"
+                      className="hidden md:inline-flex items-center gap-1 text-sm px-3.5 py-1.5 rounded-md bg-amber-800 text-amber-50 hover:bg-amber-900 active:scale-[0.99] shadow-[0_6px_14px_rgba(90,50,0,0.18)] ring-1 ring-amber-900/30 transition"
                     >
                       로그인
                     </button>
@@ -191,7 +197,7 @@ export default function HeaderNav({
                       </button>
                       <button
                         onClick={openLogin}
-                        className="inline-flex items-center gap-1 text-sm px-3.5 py-1.5 rounded-md bg-amber-800 text-amber-50 hover:bg-amber-900 active:scale-[0.99] shadow-[0_6px_14px_rgba(90,50,0,0.18)] ring-1 ring-amber-900/30 transition"
+                        className="hidden md:inline-flex items-center gap-1 text-sm px-3.5 py-1.5 rounded-md bg-amber-800 text-amber-50 hover:bg-amber-900 active:scale-[0.99] shadow-[0_6px_14px_rgba(90,50,0,0.18)] ring-1 ring-amber-900/30 transition"
                       >
                         로그인
                       </button>
@@ -199,9 +205,99 @@ export default function HeaderNav({
                   )}
                 </>
               )}
+
+              {/* 모바일 전용 로그인/로그아웃 버튼 */}
+              {user ? (
+                <button
+                  onClick={handleLogout}
+                  className="md:hidden inline-flex items-center text-xs px-2.5 py-1.5 rounded-md ring-1 ring-stone-300 text-stone-700 hover:bg-stone-100 transition"
+                >
+                  로그아웃
+                </button>
+              ) : authButtons !== "none" ? (
+                <button
+                  onClick={openLogin}
+                  className="md:hidden inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-md bg-amber-800 text-amber-50 hover:bg-amber-900 active:scale-[0.99] shadow-[0_6px_10px_rgba(90,50,0,0.18)] ring-1 ring-amber-900/30 transition"
+                >
+                  로그인
+                </button>
+              ) : null}
+
+              {/* 모바일 메뉴 토글 버튼 (햄버거) */}
+              <button
+                type="button"
+                className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-md border border-stone-300 bg-white/80 text-stone-800 shadow-sm active:scale-[0.97] transition"
+                aria-label="메뉴 열기"
+                onClick={() => setMobileNavOpen((prev) => !prev)}
+              >
+                <span className="sr-only">메뉴 열기</span>
+                <span className="flex flex-col gap-0.5">
+                  <span
+                    className={`block w-4 h-[2px] rounded bg-stone-800 transition-transform ${
+                      mobileNavOpen ? "translate-y-[3px] rotate-45" : ""
+                    }`}
+                  />
+                  <span
+                    className={`block w-4 h-[2px] rounded bg-stone-800 transition-opacity ${
+                      mobileNavOpen ? "opacity-0" : ""
+                    }`}
+                  />
+                  <span
+                    className={`block w-4 h-[2px] rounded bg-stone-800 transition-transform ${
+                      mobileNavOpen ? "-translate-y-[3px] -rotate-45" : ""
+                    }`}
+                  />
+                </span>
+              </button>
             </div>
           </div>
-        </nav>
+
+          {/* 모바일 네비게이션 (슬라이드다운) */}
+          <div
+            className={`md:hidden border-t border-stone-200/80 bg-white/95 backdrop-blur-sm overflow-hidden transition-[max-height,opacity] duration-200 ${
+              mobileNavOpen ? "max-h-40 opacity-100" : "max-h-0 opacity-0"
+            }`}
+          >
+            <div className="mx-auto max-w-6xl px-5 py-2 flex flex-col gap-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileNavOpen(false);
+                  if (lockNav) {
+                    onOpenAuth?.("login");
+                  } else {
+                    navigate("/취향기록");
+                  }
+                }}
+                className={`flex items-center justify-between px-1.5 py-1.5 rounded-md text-[13px] font-medium ${
+                  lockNav
+                    ? "text-stone-400 cursor-not-allowed"
+                    : "text-stone-800 hover:bg-stone-100 active:bg-stone-200/70"
+                }`}
+              >
+                <span>취향기록</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileNavOpen(false);
+                  if (lockNav) {
+                    onOpenAuth?.("login");
+                  } else {
+                    navigate("/guild");
+                  }
+                }}
+                className={`flex items-center justify-between px-1.5 py-1.5 rounded-md text-[13px] font-medium ${
+                  lockNav
+                    ? "text-stone-400 cursor-not-allowed"
+                    : "text-stone-800 hover:bg-stone-100 active:bg-stone-200/70"
+                }`}
+              >
+                <span>탐험가연맹</span>
+              </button>
+            </div>
+          </div>
+      </nav>
       </header>
 
       {/* 통합 인증 모달 (부모에서 onOpenAuth 안 넘겨주면 자체 표출) */}
