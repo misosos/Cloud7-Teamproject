@@ -94,8 +94,8 @@ app.use(
   helmet({
     // cross-origin 리소스(CDN 이미지 등) 차단으로 문제가 날 수 있어서 완화
     crossOriginResourcePolicy: { policy: 'cross-origin' },
-    // 필요 시 CSP(Content Security Policy)를 직접 관리하고 싶다면 아래 옵션 조정
-    // contentSecurityPolicy: false,
+    // React 빌드 스크립트 로딩을 막지 않도록 CSP는 직접 관리할 때까지 비활성화
+    contentSecurityPolicy: false,
   }),
 );
 
@@ -244,18 +244,17 @@ app.use(
 );
 
 /* ==============================================================================
- *  7. 루트 경로 핸들러
+ *  7. 헬스체크 엔드포인트
  * ============================================================================ */
 /**
- * 루트 경로 핸들러: 환영 메시지(JSON)로 200 응답
- * - 브라우저로 바로 접근했을 때도 유용한 안내를 제공합니다.
- * - 운영/모니터링용 헬스체크는 /health 엔드포인트를 별도로 유지합니다.
+ * 헬스체크 엔드포인트: 운영/모니터링용 상태 확인
+ * - /api/health로 접근 시 백엔드 상태를 JSON으로 반환합니다.
  */
-app.get('/', (_req, res) => {
+app.get('/api/health', (_req, res) => {
   res.status(200).json({
     message: 'Cloud7 Backend is running.',
     docs: '/docs (추후 Swagger 연결 시)',
-    health: '/health',
+    health: '/api/health',
   });
 });
 
@@ -283,6 +282,29 @@ app.use("/api/taste", tasteDashboardRouter);
 
 // 그 외 공통 라우터는 /api 프리픽스로 묶어서 사용
 app.use('/api', routes);
+
+/* ============================================================================
+ *  8-1. 정적 프론트엔드(React 빌드 결과) 서빙
+ * ========================================================================== */
+// 프론트엔드 빌드 결과가 위치한 디렉토리 (backend/client)
+const clientPath = path.join(__dirname, '..', 'client');
+
+// 정적 파일(JS, CSS, 이미지 등) 서빙
+app.use(express.static(clientPath));
+
+/**
+ * SPA(React Router 등)를 위한 catch-all 라우트
+ * - /api로 시작하지 않는 모든 GET 요청에 대해 index.html을 반환하여
+ *   프론트엔드 라우터가 이후 경로를 처리하도록 합니다.
+ * - /api로 시작하는 요청은 다음 미들웨어(404 핸들러 등)로 넘겨 API 규칙을 유지합니다.
+ */
+app.get(/.*/, (req, res, next) =>  {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+
+  res.sendFile(path.join(clientPath, 'index.html'));
+});
 
 /* ==============================================================================
  *  9. 404 핸들러
