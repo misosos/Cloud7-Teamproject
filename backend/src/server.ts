@@ -4,7 +4,7 @@
  * ================================================================================
  * 이 파일의 역할(Responsibilities)
  *  1) .env 환경변수 로드
- *  2) Express 앱(app) 인스턴스를 가져와 HOST/PORT에서 리슨 시작
+ *  2) Express 앱(app) 인스턴스를 가져와 PORT에서 리슨 시작 (0.0.0.0 모든 인터페이스)
  *  3) 서버 레벨 에러(EADDRINUSE, EACCES 등) 처리
  *  4) 프로세스 종료 신호 및 전역 에러(uncaught/unhandled)를 감지하고
  *     안전 종료(shutdown)를 수행
@@ -29,20 +29,13 @@ import app from './app';
 import { env } from './utils/env';
 
 /* ==============================================================================
- *  호스트 / 포트 결정 로직
+ *  포트 결정 로직
  * =========================================================================== */
-/**
- * HOST 결정
- *  - env 스키마에 HOST가 없을 수 있으므로, process.env를 직접 사용
- *  - 아무 값도 없으면 'localhost'로 폴백
- */
-const HOST = (process.env.HOST ?? 'localhost').trim();
-
 /**
  * PORT 결정
  *  - env.PORT는 문자열이므로, 숫자로 변환하여 사용
  *  - 숫자로 변환할 수 없거나 0 이하이면 기본값 3000 사용
- *  - 0.0.0.0 에서 리슨하면 외부 접근 허용 (도커/클라우드 배포에서 흔히 사용)
+ *  - 서버는 0.0.0.0(모든 인터페이스)에서 PORT로 리슨합니다.
  */
 const parsedPort = Number(env.PORT);
 const PORT = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 3000;
@@ -53,11 +46,11 @@ const PORT = Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : 3000;
 /**
  * 서버 시작
  *  - server 변수는 단 한 번만 선언 (중복 선언/중복 export 방지)
- *  - 콘솔 출력 시 0.0.0.0 은 개발자 친화적으로 localhost로 바꿔 보여줍니다.
+ *  - 0.0.0.0 에서 리슨하므로, 외부/내부 어디서든 동일한 포트로 접근 가능
  */
-const server = app.listen(PORT, HOST, () => {
-  const visibleHost = HOST === '0.0.0.0' ? 'localhost' : HOST;
-  console.log(`✅ Backend running on http://${visibleHost}:${PORT}`);
+const server = app.listen(PORT, () => {
+  // 0.0.0.0 에서 리슨하므로, 외부/내부 어디서든 동일한 포트로 접근 가능
+  console.log(`✅ Backend running on http://0.0.0.0:${PORT}`);
 });
 
 /* ==============================================================================
