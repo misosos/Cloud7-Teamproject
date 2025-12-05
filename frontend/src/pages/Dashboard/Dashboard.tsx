@@ -40,6 +40,8 @@ import RightCategorySidebar from "@/components/RightCategorySidebar";
 import RecordGallery from "@/pages/Dashboard/RecordGallery";
 import MobileCategoryGrid from "@/components/MobileCategoryGrid";
 import TasteInsights from "@/pages/Dashboard/TasteInsights";
+import Missions from "@/components/Missions";
+import StayTasteRecord from "@/pages/Dashboard/StayTasteRecord";
 import { Link } from "react-router-dom";
 
 export default function Dashboard() {
@@ -95,6 +97,13 @@ export default function Dashboard() {
         <MobileCategoryGrid />
       </section>
 
+    {/*도감용 미션장소들 이름 뽑기*/}
+    <div>
+      <h2>추천 디버그</h2>
+      <Missions />
+    </div>
+    {/* 머문 장소 기반 취향 대시보드 섹션 */}
+      <StayTasteRecord />
       {/**
        * 4) 본문 12컬럼 레이아웃
        *  - 좌/우 사이드바(데스크톱 전용) + 중앙 콘텐츠로 구성합니다.

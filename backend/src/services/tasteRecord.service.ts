@@ -27,6 +27,19 @@ const prisma = new PrismaClient();
 // - createdAt:
 //   - Date 객체 → ISO 문자열로 변환
 // ============================================================
+// 우리가 취향으로 추적할 카테고리 7개 (Stay.mappedCategory와 일치해야 함)
+const TRACKED_CATEGORIES = [
+  "영화",
+  "공연",
+  "전시",
+  "문화시설",
+  "관광명소",
+  "카페",
+  "식당",
+] as const;
+
+export type TrackedCategory = (typeof TRACKED_CATEGORIES)[number];
+
 function serialize(record: any) {
   return {
     id: record.id,
@@ -273,6 +286,7 @@ export async function getTasteRecordInsightsByUser(
     .sort((a, b) => b.recordDate.localeCompare(a.recordDate))
     .slice(0, 10);
 
+    
   return {
     totalCount,
     byCategory,
@@ -281,5 +295,96 @@ export async function getTasteRecordInsightsByUser(
     recentRecords,
     categoryStats,
     tagStats,
+  };
+  
+}
+
+// ============================================================
+// [서비스] Stay 기반 취향 대시보드 계산 + TasteRecord(DASHBOARD)로 스냅샷 저장
+// ------------------------------------------------------------
+// - Stay.mappedCategory를 groupBy 해서 비율(0~1) 계산
+// - TasteRecord 테이블에 category='DASHBOARD'인 레코드를 upsert
+// - 프론트에서는 weights를 그대로 사용해 퍼센트 막대 등으로 활용 가능
+// ============================================================
+export interface TasteDashboardResult {
+  totalStays: number;
+  weights: Record<TrackedCategory, number>;
+  // 원하면 프론트에서 바로 써먹을 수 있게, 직렬화된 TasteRecord도 함께 반환
+  dashboardRecord: TasteRecordDTO | null;
+}
+
+export async function buildTasteDashboardFromStays(
+  userId: number,
+): Promise<TasteDashboardResult> {
+  // Stay에서 카테고리별 개수 집계
+  const grouped = await prisma.stay.groupBy({
+    by: ["mappedCategory"],
+    where: {
+      userId,
+      mappedCategory: { not: null },
+    },
+    _count: { _all: true },
+  });
+
+  const total = grouped.reduce((sum, g) => sum + g._count._all, 0);
+
+  // 기본 0으로 채운 weight 맵
+  const weights: Record<TrackedCategory, number> = {
+    영화: 0,
+    공연: 0,
+    전시: 0,
+    문화시설: 0,
+    관광명소: 0,
+    카페: 0,
+    식당: 0,
+  };
+
+  if (total > 0) {
+    TRACKED_CATEGORIES.forEach((cat) => {
+      const row = grouped.find((g) => g.mappedCategory === cat);
+      const count = row?._count._all ?? 0;
+      weights[cat] = count / total; // 비율 (0~1)
+    });
+  }
+
+  // 👇 TasteRecord에 스냅샷으로 저장 (category='DASHBOARD')
+  const tagsJson = JSON.stringify(weights);
+
+  let dashboardRecord: TasteRecordDTO | null = null;
+
+  try {
+    const raw = await prisma.tasteRecord.upsert({
+      where: {
+        userId_category: {
+          userId,
+          category: "DASHBOARD",
+        },
+      },
+      create: {
+        userId,
+        title: "나의 취향 대시보드",
+        desc: "Stay 기록을 기반으로 계산된 문화 취향 비율입니다.",
+        content: null,
+        recordedAt: new Date(),
+        category: "DASHBOARD",
+        tagsJson,
+        thumb: null,
+      },
+      update: {
+        desc: "Stay 기록을 기반으로 다시 계산된 문화 취향 비율입니다.",
+        recordedAt: new Date(),
+        tagsJson,
+      },
+    });
+
+    dashboardRecord = serialize(raw);
+  } catch (e) {
+    console.error("[TasteDashboard] upsert 실패", e);
+  }
+
+  return {
+    totalStays: total,
+    weights,
+    dashboardRecord,
   };
 }
