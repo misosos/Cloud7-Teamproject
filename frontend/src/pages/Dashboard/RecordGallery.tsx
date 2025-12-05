@@ -17,7 +17,9 @@ import type { TasteRecordItem,TasteRecordListResponse } from "@/types/type";
  *
  * ▸ 데이터 흐름(중요)
  *   1) 전역 카테고리 상태 `current`를 Zustand 스토어(useCategory)에서 읽습니다.
- *   2) 컴포넌트 마운트 시 `GET /taste-records` API로 전체 기록 목록을 한 번 조회합니다.
+ *   2) 컴포넌트 마운트 시 `GET /api/taste-records` API로 전체 기록 목록을 한 번 조회합니다.
+ *      (컴포넌트에서는 상대 경로 `"/taste-records"`를 넘기고,
+ *       실제 요청 URL 생성은 apiClient의 `API_BASE`(`/api`) 설정을 따릅니다.)
  *   3) 가져온 전체 기록 중에서 `category === current` 인 것만 필터링합니다.
  *   4) `createdAt` 기준으로 최신순(내림차순) 정렬합니다.
  *   5) 앞에서부터 4개만 잘라(slice) 노출합니다.

@@ -1,5 +1,5 @@
 // frontend/src/services/guildService.ts
-import apiClient from "./apiClient";
+import apiClient from "../api/apiClient";
 
 /**
  * 내 연맹 상태 타입

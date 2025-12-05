@@ -80,6 +80,7 @@ export default function TasteInsights() {
   const [insights, setInsights] = useState<TasteInsightsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [unauthorized, setUnauthorized] = useState(false);
 
   // 총 기록 수를 안전하게 계산 (백엔드에서 totalCount가 안 올 경우 대비)
   const totalCount = useMemo(() => {
@@ -109,6 +110,7 @@ export default function TasteInsights() {
       try {
         setLoading(true);
         setError(null);
+        setUnauthorized(false);
 
         const res = await apiClient.get<TasteInsightsResponse>(
           "/taste-records/insights",
@@ -123,13 +125,22 @@ export default function TasteInsights() {
         }
       } catch (err) {
         console.error("[TasteInsights] 분석 조회 실패", err);
-        if (mounted) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "분석 데이터를 불러오는 중 오류가 발생했습니다.",
-          );
+
+        if (!mounted) return;
+
+        const message =
+          err instanceof Error
+            ? err.message
+            : "분석 데이터를 불러오는 중 오류가 발생했습니다.";
+
+        // 로그인하지 않은 상태(401)인 경우: 에러 카드 대신 '로그인 필요' 안내만 보여줌
+        if (message.includes("로그인이 필요합니다")) {
+          setUnauthorized(true);
+          setError(null);
+          return;
         }
+
+        setError(message);
       } finally {
         if (mounted) {
           setLoading(false);
@@ -174,6 +185,17 @@ export default function TasteInsights() {
     return (
       <div className="flex h-full items-center justify-center">
         <p className="text-sm text-stone-600">취향 분석을 불러오는 중입니다...</p>
+      </div>
+    );
+  }
+
+  if (unauthorized) {
+    return (
+      <div className="rounded-lg border border-amber-200/80 bg-white p-4 text-sm text-stone-700 shadow-sm">
+        <p className="font-medium">로그인 후 이용 가능한 기능입니다.</p>
+        <p className="mt-1 text-xs text-stone-500">
+          취향 분석은 내 계정에 기록된 데이터를 기반으로 제공돼요. 로그인한 뒤 다시 확인해 주세요.
+        </p>
       </div>
     );
   }

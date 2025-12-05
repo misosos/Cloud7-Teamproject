@@ -1,6 +1,6 @@
 // frontend/src/services/guildApi.ts
 
-import apiClient from "./apiClient";
+import apiClient from "../api/apiClient";
 import type { OfficialDexItem, TasteRecordItem } from "@/types/type";
 import type { GuildDTO as BackendGuildDTO } from "./guildService";
 

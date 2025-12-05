@@ -76,15 +76,33 @@ export function qs(params?: Record<string, any>): string {
 
 // path와 쿼리 파라미터를 합쳐 최종 호출 URL을 생성하는 헬퍼
 export function buildUrl(path: string, params?: Record<string, any>): string {
-  // 절대 URL이면 그대로 사용
-  const base = isAbsolute(path) ? '' : API_BASE;
+  // 절대 URL이면 그대로 사용 (API_BASE를 붙이지 않음)
+  const isAbs = isAbsolute(path);
+  const base = isAbs ? '' : API_BASE;
 
-  // 선행 슬래시 보정
-  const normalizedPath = isAbsolute(path)
-    ? path
-    : path.startsWith('/')
-      ? path
-      : `/${path}`;
+  let normalizedPath: string;
+
+  if (isAbs) {
+    normalizedPath = path;
+  } else {
+    let p = path.trim();
+
+    // ✅ 방어 로직: 호출 시 실수로 '/api/...' 또는 'api/...'를 넘겨도
+    //    최종 URL이 '/api/api/...' 가 되지 않도록 '/api' 프리픽스를 제거
+    if (p.startsWith('/api/')) {
+      p = p.slice(4); // '/api' 길이만큼 잘라서 '/taste-records/...' 형태로 만듦
+    } else if (p === '/api' || p === 'api') {
+      p = '';
+    } else if (p.startsWith('api/')) {
+      p = p.slice(3); // 'api/...' -> '/...'
+    }
+
+    if (p === '') {
+      normalizedPath = '';
+    } else {
+      normalizedPath = p.startsWith('/') ? p : `/${p}`;
+    }
+  }
 
   // 쿼리스트링 생성
   const query = qs(params); // '' 또는 '?a=1'
@@ -279,7 +297,9 @@ export interface TasteRecordInsights {
 
 /**
  * 취향 분석(인사이트) 데이터 조회
- *  - 백엔드: GET /taste-records/insights
+ *  - 최종 요청 경로: GET /api/taste-records/insights
+ *    (API_BASE가 '/api' 또는 'http://host:port/api' 형태이고,
+ *     여기서는 '/taste-records/insights' 상대 경로만 넘깁니다.)
  */
 export const getTasteRecordInsights = (): Promise<TasteRecordInsights> => {
   return httpGet<TasteRecordInsights>('/taste-records/insights');

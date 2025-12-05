@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import apiClient from "@/services/apiClient";
+import apiClient from "../api/apiClient";
 
 // 로컬스토리지에 저장할 때 사용할 키 이름
 const PERSIST_KEY = "auth-v2";

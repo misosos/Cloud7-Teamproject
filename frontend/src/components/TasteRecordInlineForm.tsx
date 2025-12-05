@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { TasteRecordItem } from "@/types/type";
+import { buildUrl } from "@/api/apiClient";
 
 /**
  * 취향 기록 작성 인라인 폼
@@ -10,8 +11,10 @@ import type { TasteRecordItem } from "@/types/type";
  *
  * 요청 흐름
  * 1) 사용자가 입력값을 작성하고 [저장하기]를 누릅니다.
- * 2) 이미지가 있으면 `/api/uploads/taste-records`로 업로드합니다.
- * 3) 업로드된 이미지 URL과 함께 `/api/taste-records`에 POST 요청을 보냅니다.
+ * 2) 이미지가 있으면 `/uploads/taste-records` 상대 경로를 사용해 업로드합니다.
+ *    (실제 엔드포인트는 API_BASE(`/api`)가 붙은 `/api/uploads/taste-records` 입니다.)
+ * 3) 업로드된 이미지 URL과 함께 `/taste-records` 상대 경로로 POST 요청을 보냅니다.
+ *    (실제 엔드포인트는 `/api/taste-records` 입니다.)
  * 4) 성공 시 onSaveSuccess 콜백으로 상위 컴포넌트에 생성된 기록을 전달합니다.
  *
  * 연동 포인트
@@ -127,7 +130,7 @@ export default function TasteRecordModal({
         const formData = new FormData();
         formData.append("file", imageFile);
 
-        const uploadResponse = await fetch("/api/uploads/taste-records", {
+        const uploadResponse = await fetch(buildUrl("/uploads/taste-records"), {
           method: "POST",
           credentials: "include", // 세션/쿠키 기반 인증 사용 시
           body: formData, // multipart/form-data는 브라우저가 자동으로 헤더 생성
@@ -152,7 +155,7 @@ export default function TasteRecordModal({
       }
 
       // 실제 취향 기록 저장 API 호출
-      const response = await fetch("/api/taste-records", {
+      const response = await fetch(buildUrl("/taste-records"), {
         method: "POST",
         credentials: "include", // 세션/쿠키 기반 인증 사용
         headers: {

@@ -19,7 +19,7 @@
 
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import apiClient from "@/api/apiClient";
+import apiClient, { buildUrl } from "@/api/apiClient";
 import type { TasteRecordItem } from "@/types/type";
 
 // TasteRecordItem 안에서 "이미지 경로" 후보를 추출하는 헬퍼
@@ -54,24 +54,24 @@ function resolveThumbUrl(rawThumb?: string | null): string | null {
     return rawThumb;
   }
 
-  // 이미 /api/ 로 시작하는 경우 그대로 사용
+  // 이미 /api/ 로 시작하는 경우 그대로 사용 (서버가 절대 경로를 내려주는 케이스 대비)
   if (rawThumb.startsWith("/api/")) {
     return rawThumb;
   }
 
   // 백엔드에서 `/uploads/...` 형태로 내려온 경우
-  // 프론트에서는 Vite 프록시(`/api`)를 통해 백엔드 정적 파일에 접근하므로 `/api`를 붙여준다.
+  // 실제 요청 URL 생성은 apiClient의 API_BASE(`/api`) 설정을 따르도록 buildUrl을 사용한다.
   if (rawThumb.startsWith("/uploads/")) {
-    return `/api${rawThumb}`;
+    return buildUrl(rawThumb);
   }
 
   // taste-records/파일명 혹은 그냥 파일명으로 내려오는 경우를 대비
   if (!rawThumb.startsWith("/")) {
-    return `/api/uploads/taste-records/${rawThumb}`;
+    return buildUrl(`/uploads/taste-records/${rawThumb}`);
   }
 
-  // 그 외의 경우는 일단 `/api` 프리픽스를 붙여서 시도
-  return `/api${rawThumb}`;
+  // 그 외의 경우는 일단 buildUrl을 통해 API_BASE와 합쳐서 시도
+  return buildUrl(rawThumb);
 }
 
 export default function TasteDetail() {
@@ -114,7 +114,7 @@ export default function TasteDetail() {
         setIsLoading(true);
         setErrorMessage(null);
   
-        const res = await fetch(`/api/taste-records/${id}`, {
+        const res = await fetch(buildUrl(`/taste-records/${id}`), {
           credentials: "include",
         });
   

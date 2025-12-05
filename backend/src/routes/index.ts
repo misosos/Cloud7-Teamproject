@@ -80,15 +80,15 @@ router.use('/auth', auth);
 //   - 최종 경로: GET /api/health
 router.use('/health', health);
 
-// 참고: tasteRecordsRouter 는 현재 import 만 되어 있고,
-//          이 파일에서는 아직 사용하지 않습니다.
-//          (팀에서 라우트 추가 시 아래와 같이 장착할 수 있습니다.)
+// '/taste-records/*' 로 들어오는 모든 요청을 tasteRecordsRouter가 처리하도록 연결
 //
-//   예시)
-//     router.use('/taste-records', tasteRecordsRouter);
+// 예)
+//   - tasteRecords.routes.ts 에서 router.get('/', ...) 이라면
+//   - 실제 전체 경로는 GET /taste-records 가 됩니다.
 //
-//   → app.ts 의 `app.use('/api', routes)` 와 조합하면
-//     최종 경로: /api/taste-records/*
+// app.ts 에서 '/api' prefix를 붙이면:
+//   - 최종 경로: GET /api/taste-records/*
+router.use('/taste-records', tasteRecordsRouter);
 
 // ==============================================
 // 상위 라우터 export
