@@ -2,11 +2,10 @@
 // src/routes/tasteDashboard.routes.ts
 
 import { Router, type Request, type Response } from "express";
-import { PrismaClient } from "@prisma/client";
 import authRequired from "../middlewares/authRequired";
+import { prisma } from "../lib/prisma";
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // 우리가 추적하는 7개 카테고리
 const TRACKED_CATEGORIES = [

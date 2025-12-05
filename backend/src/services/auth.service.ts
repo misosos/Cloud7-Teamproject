@@ -131,10 +131,18 @@ export async function verifyUserCredentials(
 ): Promise<SafeUser | null> {
   const key = email.trim().toLowerCase();
   const user = await prisma.user.findUnique({ where: { email: key } });
-  if (!user) return null; // 존재하지 않는 이메일
+
+  // 존재하지 않는 이메일 → 일관된 에러 메시지로 throw
+  if (!user) {
+    throw new Error('INVALID_CREDENTIALS');
+  }
 
   const ok = await bcrypt.compare(password, (user as any).passwordHash);
-  if (!ok) return null; // 비밀번호 불일치
+
+  // 비밀번호 불일치 → 동일한 에러 메시지로 throw
+  if (!ok) {
+    throw new Error('INVALID_CREDENTIALS');
+  }
 
   return toSafeUser(user as DbUserShape);
 }

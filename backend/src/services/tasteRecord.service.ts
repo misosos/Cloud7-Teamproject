@@ -7,11 +7,7 @@
 //   이 파일은 "데이터 생성/조회 + 직렬화"만 담당합니다.
 // ============================================================
 
-import { PrismaClient } from '@prisma/client';
-
-// 현재는 이 서비스 파일에서 Prisma 클라이언트를 직접 생성해서 사용
-// (규모가 커지면 /lib/prisma.ts 같은 곳에서 싱글톤으로 관리해도 됨)
-const prisma = new PrismaClient();
+import { prisma } from '../lib/prisma';
 
 // ============================================================
 // 헬퍼 함수: serialize

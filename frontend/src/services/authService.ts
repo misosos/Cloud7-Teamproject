@@ -1,4 +1,4 @@
-import { httpGet, httpPost } from "./apiClient";
+import { httpGet, httpPost } from "../api/apiClient";
 
 // 서버에서 내려오는 사용자 정보 타입
 export type User = {

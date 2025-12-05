@@ -19,6 +19,7 @@
  *     - `cors`                  : 프론트 도메인에서의 쿠키 포함 요청 허용
  *     - `express-session`       : 세션(쿠키) 복원 및 생성
  *  3) 마지막에 `/api` 경로로 분기되어 `/api/health`, `/api/auth`, `/api/taste-records`
+ *     ⚠️ 프론트엔드에서는 취향 기록 API를 호출할 때 반드시 `/api/taste-records`로 요청해야 합니다. `/taste-records`처럼 `/api` 없이 호출하면 React index.html이 반환되어 "Unexpected token '<'" 와 같은 JSON 파싱 에러가 발생할 수 있습니다.
  *     등 개별 엔드포인트를 처리합니다.
  *
  * 🔐 환경변수(.env) 가이드
@@ -96,6 +97,8 @@ app.use(
     crossOriginResourcePolicy: { policy: 'cross-origin' },
     // React 빌드 스크립트 로딩을 막지 않도록 CSP는 직접 관리할 때까지 비활성화
     contentSecurityPolicy: false,
+    // HTTPS가 아닌 학교 클라우드 환경에서 불필요한 경고를 막기 위해 COOP 비활성화
+    crossOriginOpenerPolicy: false,
   }),
 );
 
@@ -230,14 +233,11 @@ app.use(
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax',
-      secure: env.NODE_ENV === 'production',
-      // 운영 시 필요한 경우에만 도메인 설정(예: .your.domain)
-      domain:
-        env.NODE_ENV === 'production' && process.env.COOKIE_DOMAIN
-          ? process.env.COOKIE_DOMAIN
-          : undefined,
-      // 필요 시 세션 만료 설정 (예: 7일)
+      // 현재 학교 클라우드 환경은 HTTP이므로 개발 모드와 동일하게 설정
+      sameSite: 'lax',
+      secure: false,
+      // 단일 IP로 접근하므로 domain 설정은 생략
+      // 나중에 HTTPS + 도메인 붙이면 여기서 sameSite/secure/domain 다시 조정
       // maxAge: 7 * 24 * 60 * 60 * 1000,
     },
   }),

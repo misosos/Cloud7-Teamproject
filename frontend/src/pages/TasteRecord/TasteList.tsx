@@ -23,6 +23,7 @@ import TasteRecordModal from "@/components/TasteRecordInlineForm";
 import BookCard from "@/components/BookCard";
 import type { TasteRecordItem } from "@/types/type";
 import { categoryOptions, tagOptions } from "@/data/mock";
+import { buildUrl } from "@/api/apiClient";
 
 /**
  * SectionTitle: 섹션 제목 + 얇은 구분선
@@ -161,8 +162,10 @@ export default function TasteList() {
       setIsLoading(true);
       setErrorMessage(null);
 
-      // 프록시 설정에 의해 /taste-records -> /api/taste-records 로 전달됨
-      const res = await fetch("/taste-records", {
+      // apiClient의 API_BASE(`/api`) 설정을 따르도록 buildUrl 사용
+      // - 로컬 개발: Vite 프록시를 통해 백엔드로 전달
+      // - 배포 서버: 동일 오리진의 `/api/taste-records`로 호출
+      const res = await fetch(buildUrl("/taste-records"), {
         credentials: "include",
       });
 

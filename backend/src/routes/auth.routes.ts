@@ -1,7 +1,7 @@
 /**
  * 인증(Auth) 라우터
- * - 이 파일은 인증 관련 엔드포인트(`/auth/*`)만 담당합니다.
- * - 보통 `app.ts` 또는 `src/routes/index.ts`에서 `app.use('/auth', authRouter)`로 마운트하여 사용합니다.
+ * - 이 파일은 인증 관련 엔드포인트(`/api/auth/*`)만 담당합니다.
+ * - 보통 `app.ts` 또는 `src/routes/index.ts`에서 `app.use('/api/auth', authRouter)`로 마운트하여 사용합니다.
  *
  * ──────────────────────────────────────────────────────────────────────────
  * 프론트엔드 연동 규칙(세션 쿠키 기반)
@@ -32,15 +32,15 @@
  * 1) 회원가입:
  *    curl -i -c cookies.txt -H "Content-Type: application/json" \
  *      -d '{"email":"a@b.com","password":"123456","name":"홍길동"}' \
- *      http://localhost:3000/auth/register
+ *      http://localhost:3000/api/auth/register
  * 2) 로그인:
  *    curl -i -b cookies.txt -c cookies.txt -H "Content-Type: application/json" \
  *      -d '{"email":"a@b.com","password":"123456"}' \
- *      http://localhost:3000/auth/login
+ *      http://localhost:3000/api/auth/login
  * 3) 세션 확인:
- *    curl -i -b cookies.txt http://localhost:3000/auth/me
+ *    curl -i -b cookies.txt http://localhost:3000/api/auth/me
  * 4) 로그아웃:
- *    curl -i -b cookies.txt -X POST http://localhost:3000/auth/logout
+ *    curl -i -b cookies.txt -X POST http://localhost:3000/api/auth/logout
  *
  * ──────────────────────────────────────────────────────────────────────────
  * 프론트 예시(axios)
@@ -106,7 +106,7 @@ router.get('/me', me);
  * curl 예시
  *   curl -i -c cookies.txt -H "Content-Type: application/json" \
  *     -d '{"email":"a@b.com","password":"123456","name":"홍길동"}' \
- *     http://localhost:3000/auth/register
+ *     http://localhost:3000/api/auth/register
  */
 router.post('/register', register);
 
@@ -139,7 +139,7 @@ router.post('/register', register);
  * curl 예시
  *   curl -i -b cookies.txt -c cookies.txt -H "Content-Type: application/json" \
  *     -d '{"email":"a@b.com","password":"123456"}' \
- *     http://localhost:3000/auth/login
+ *     http://localhost:3000/api/auth/login
  */
 router.post('/login', login);
 
@@ -154,7 +154,7 @@ router.post('/login', login);
  *     { ok: true }
  *
  * curl 예시
- *   curl -i -b cookies.txt -X POST http://localhost:3000/auth/logout
+ *   curl -i -b cookies.txt -X POST http://localhost:3000/api/auth/logout
  */
 router.post('/logout', logout);
 

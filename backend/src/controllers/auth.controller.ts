@@ -200,6 +200,7 @@ export const register = async (req: Request, res: Response) => {
       });
     }
   } catch (err: any) {
+    console.error('[auth/register] error:', err);
     const message = String(err?.message || '');
 
     // 이메일 중복 에러 패턴 (서비스 레이어에서 던지는 메시지 기준으로 추정)
@@ -285,8 +286,23 @@ export const login = async (req: Request, res: Response) => {
         user: (req as any).session.user,
       });
     }
-  } catch {
+  } catch (err: any) {
     // 서비스/DB 예외 등 기타 서버 내부 오류
+    console.error('[auth/login] error:', err);
+    const message = String(err?.message || '');
+
+    // 서비스 레이어에서 "잘못된 자격 증명"을 에러로 던지는 경우를 401로 매핑
+    if (
+      /invalid/i.test(message) ||
+      /credential/i.test(message) ||
+      /not\s*found/i.test(message) ||
+      /unauthorized/i.test(message) ||
+      /401/.test(message)
+    ) {
+      return res.status(401).json({ ok: false, error: 'Invalid credentials' });
+    }
+
+    // 그 외는 진짜 서버 내부 오류로 간주
     return res.status(500).json({ ok: false, error: 'Login failed' });
   }
 };

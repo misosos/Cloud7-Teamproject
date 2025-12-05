@@ -13,19 +13,13 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:3000', // 백엔드 서버 주소/포트
+        // 개발할 때도 클라우드에 올려둔 실제 백엔드로 프록시
+        target: 'http://113.198.66.75:13111',
         changeOrigin: true,
         secure: false,
-      },
-      '/taste-records': {
-        target: 'http://localhost:3000', // 백엔드 서버 주소/포트
-        changeOrigin: true,
-        secure: false,
-        // 프론트에서 /taste-records 로 호출하면 백엔드 /api/taste-records 로 전달
-        rewrite: (path) => path.replace(/^\/taste-records/, '/api/taste-records'),
       },
       '/uploads': {
-        target: "http://localhost:3000",
+        target: 'http://113.198.66.75:13111',
         changeOrigin: true,
         secure: false,
       },
