@@ -1,200 +1,213 @@
-// backend/src/services/recommendation.service.ts
-
-import { getTasteRecordInsightsByUser } from "./tasteRecord.service";
+// src/services/recommendation.service.ts
+import prisma from "../lib/prisma";
 
 const KAKAO_REST_API_KEY = process.env.KAKAO_REST_API_KEY || "";
+const KAKAO_LOCAL_BASE =
+  "https://dapi.kakao.com/v2/local/search/category.json";
 
-export interface RecommendedPlace {
+export const TRACKED_CATEGORIES = [
+  "영화",
+  "공연",
+  "전시",
+  "문화시설",
+  "관광명소",
+  "카페",
+  "식당",
+] as const;
+export type TrackedCategory = (typeof TRACKED_CATEGORIES)[number];
+
+type FunCategoryGroup = "CT1" | "AT4" | "CE7" | "FD6";
+
+interface KakaoPlaceDocument {
+  id: string;
+  place_name: string;
+  category_name: string;
+  category_group_code: FunCategoryGroup | string;
+  x: string;
+  y: string;
+  phone: string;
+  road_address_name: string;
+  address_name: string;
+  distance?: string;
+}
+
+interface KakaoPlaceResponse {
+  documents: KakaoPlaceDocument[];
+}
+
+export interface PlaceDTO {
   id: string;
   name: string;
-  category: string; // 우리 서비스 기준 카테고리 (예: 카페, 영화, 전시 등)
+  categoryName: string;
+  categoryGroupCode: string;
+  mappedCategory: TrackedCategory | null;
+  x: number;
+  y: number;
+  phone: string;
+  roadAddress: string;
   address: string;
-  lat: number;
-  lng: number;
   distanceMeters: number;
-  score: number; // 거리 + 취향 비율 기반 점수
 }
 
-// Kakao Local 카테고리 코드 매핑
-// (필요하면 나중에 더 추가 가능)
-const CATEGORY_PREFERENCE_MAP: Record<string, string[]> = {
-  카페: ["CE7"], // 카페
-  음식: ["FD6"], // 음식점
-  영화: ["CT1"], // 문화시설(영화관 포함)
-  전시: ["CT1"], // 문화시설
-  여행: ["AD5", "AT4"], // 숙박, 관광명소
-  DEFAULT: ["CT1", "FD6", "CE7"],
-};
-
-// 우리 쪽 "취향 카테고리" 문자열을 정규화
-function normalizeCategory(raw: string): string {
-  const name = (raw || "").toLowerCase();
-
-  if (name.includes("카페") || name.includes("커피") || name.includes("디저트")) {
-    return "카페";
-  }
-
-  if (name.includes("음식") || name.includes("맛집") || name.includes("밥") || name.includes("식당")) {
-    return "음식";
-  }
-
-  if (name.includes("영화") || name.includes("시네마") || name.includes("극장")) {
-    return "영화";
-  }
-
-  if (
-    name.includes("전시") ||
-    name.includes("미술관") ||
-    name.includes("갤러리") ||
-    name.includes("뮤지엄")
-  ) {
-    return "전시";
-  }
-
-  if (name.includes("여행") || name.includes("관광") || name.includes("명소")) {
-    return "여행";
-  }
-
-  return "DEFAULT";
+export interface RecommendedPlace extends PlaceDTO {
+  mappedCategory: TrackedCategory;
+  score: number;
 }
 
-/**
- * 유저의 취향 기록(카테고리 분석 결과)을 바탕으로
- * 현재 위치 주변(기본 3km) "취향 저격 장소"를 추천해주는 서비스 함수
- */
+const FUN_CATEGORY_GROUPS: FunCategoryGroup[] = [
+  "CT1",
+  "AT4",
+  "CE7",
+  "FD6",
+];
+
+function mapCategory(doc: KakaoPlaceDocument): TrackedCategory | null {
+  const group = doc.category_group_code;
+  const name = doc.category_name ?? "";
+
+  if (group === "CT1") {
+    if (name.includes("영화")) return "영화";
+    if (
+      name.includes("공연") ||
+      name.includes("아트홀") ||
+      name.includes("뮤지컬") ||
+      name.includes("라이브")
+    )
+      return "공연";
+    if (name.includes("전시") || name.includes("미술") || name.includes("갤러리"))
+      return "전시";
+    return "문화시설";
+  }
+  if (group === "AT4") return "관광명소";
+  if (group === "CE7") return "카페";
+  if (group === "FD6") return "식당";
+  return null;
+}
+
+function toPlaceDTO(doc: KakaoPlaceDocument): PlaceDTO {
+  return {
+    id: doc.id,
+    name: doc.place_name,
+    categoryName: doc.category_name,
+    categoryGroupCode: doc.category_group_code,
+    mappedCategory: mapCategory(doc),
+    x: Number(doc.x),
+    y: Number(doc.y),
+    phone: doc.phone,
+    roadAddress: doc.road_address_name,
+    address: doc.address_name,
+    distanceMeters: doc.distance ? Number(doc.distance) : 0,
+  };
+}
+
+// Stay 기반 취향 weight 계산 (0~1)
+export async function getUserCategoryWeights(userId: number) {
+  const grouped = await prisma.stay.groupBy({
+    by: ["mappedCategory"],
+    where: {
+      userId,
+      mappedCategory: { not: null },
+    },
+    _count: { _all: true },
+  });
+
+  const total = grouped.reduce((sum, g) => sum + g._count._all, 0);
+
+  const weights: Record<TrackedCategory, number> = {
+    영화: 0,
+    공연: 0,
+    전시: 0,
+    문화시설: 0,
+    관광명소: 0,
+    카페: 0,
+    식당: 0,
+  };
+
+  if (total === 0) {
+    // 방문기록이 하나도 없을 때 → 균등 분배
+    const equal = 1 / TRACKED_CATEGORIES.length;
+    TRACKED_CATEGORIES.forEach((c) => {
+      weights[c] = equal;
+    });
+    return { weights, hasTasteData: false };
+  }
+
+  TRACKED_CATEGORIES.forEach((cat) => {
+    const row = grouped.find((g) => g.mappedCategory === cat);
+    const count = row?._count._all ?? 0;
+    weights[cat] = count / total;
+  });
+
+  const hasAny = TRACKED_CATEGORIES.some((c) => weights[c] > 0);
+  return { weights, hasTasteData: hasAny };
+}
+
+// 카카오에서 현재 위치 주변 놀거리 가져오기
+export async function fetchNearbyFunPlaces(
+  lat: number,
+  lng: number,
+  radiusMeters = 3000,
+): Promise<PlaceDTO[]> {
+  if (!KAKAO_REST_API_KEY) {
+    throw new Error("KAKAO_REST_API_KEY is not set");
+  }
+
+  const x = String(lng);
+  const y = String(lat);
+  const radius = String(radiusMeters);
+
+  const all: PlaceDTO[] = [];
+
+  for (const group of FUN_CATEGORY_GROUPS) {
+    const url = new URL(KAKAO_LOCAL_BASE);
+    url.searchParams.set("category_group_code", group);
+    url.searchParams.set("x", x);
+    url.searchParams.set("y", y);
+    url.searchParams.set("radius", radius);
+    url.searchParams.set("sort", "distance");
+    url.searchParams.set("size", "15");
+
+    const resp = await fetch(url.toString(), {
+      headers: { Authorization: `KakaoAK ${KAKAO_REST_API_KEY}` },
+    });
+
+    if (!resp.ok) {
+      console.error("[fetchNearbyFunPlaces] Kakao error:", resp.status);
+      continue;
+    }
+
+    const json = (await resp.json()) as KakaoPlaceResponse;
+    json.documents.map(toPlaceDTO).forEach((p) => all.push(p));
+  }
+
+  const dedup = new Map<string, PlaceDTO>();
+  all.forEach((p) => dedup.set(p.id, p));
+  return Array.from(dedup.values());
+}
+
+// 유저 취향 + 현재 위치 기준 추천 리스트
 export async function getPlacesRecommendedByTaste(
   userId: number,
   lat: number,
   lng: number,
-  radius = 3000 // 기본 3km
+  radius = 3000,
 ): Promise<RecommendedPlace[]> {
-  if (!KAKAO_REST_API_KEY) {
-    console.error("[Recommend] KAKAO_REST_API_KEY not set");
-    return [];
-  }
+  const { weights } = await getUserCategoryWeights(userId);
+  const nearby = await fetchNearbyFunPlaces(lat, lng, radius);
 
-  // 1) 유저 취향 인사이트 조회
-  const insights: any = await getTasteRecordInsightsByUser(userId).catch(
-    (err) => {
-      console.error("[Recommend] getTasteRecordInsightsByUser error", err);
-      return null;
-    }
-  );
+  const scored: RecommendedPlace[] = nearby
+    .map((p) => {
+      if (!p.mappedCategory) return null;
+      const w = weights[p.mappedCategory] ?? 0;
+      if (w <= 0) return null;
+      return {
+        ...p,
+        mappedCategory: p.mappedCategory,
+        score: w,
+      };
+    })
+    .filter((x): x is RecommendedPlace => x !== null);
 
-  const categoryStats: any[] = insights?.categoryStats ?? [];
-  const totalCount: number = insights?.totalCount ?? 0;
-
-  if (!Array.isArray(categoryStats) || categoryStats.length === 0 || totalCount === 0) {
-    // 취향 데이터가 거의 없으면 추천 불가
-    return [];
-  }
-
-  // 2) 카테고리별 사용량 기준으로 상위 카테고리 선택 (예: TOP 3)
-  const sortedCategories = [...categoryStats].sort(
-    (a, b) => (b.count ?? 0) - (a.count ?? 0)
-  );
-  const topCategories = sortedCategories.slice(0, 3);
-
-  const allCandidates: RecommendedPlace[] = [];
-
-  // 3) 상위 카테고리들 각각에 대해 Kakao Local API 호출
-  for (const cat of topCategories) {
-    const normalized = normalizeCategory(cat.category);
-    const kakaoCodes =
-      CATEGORY_PREFERENCE_MAP[normalized] ??
-      CATEGORY_PREFERENCE_MAP["DEFAULT"];
-
-    for (const cg of kakaoCodes) {
-      const url = new URL(
-        "https://dapi.kakao.com/v2/local/search/category.json"
-      );
-      url.searchParams.set("category_group_code", cg);
-      url.searchParams.set("x", String(lng)); // 경도
-      url.searchParams.set("y", String(lat)); // 위도
-      url.searchParams.set("radius", String(Math.min(radius, 20000))); // 최대 20km
-      url.searchParams.set("sort", "distance");
-
-      let json: any;
-      try {
-        const resp = await fetch(url.toString(), {
-          headers: {
-            Authorization: `KakaoAK ${KAKAO_REST_API_KEY}`,
-          },
-        });
-
-        if (!resp.ok) {
-          const text = await resp.text();
-          console.error(
-            "[Recommend] Kakao API error",
-            resp.status,
-            text
-          );
-          continue;
-        }
-
-        json = await resp.json();
-      } catch (err) {
-        console.error("[Recommend] Kakao fetch error", err);
-        continue;
-      }
-
-      const places: any[] = json?.documents ?? [];
-
-      for (const p of places) {
-        // Kakao distance는 문자열("123")로 오는 경우가 많음
-        const rawDistance: any = (p as any).distance;
-        const distance =
-          typeof rawDistance === "number"
-            ? rawDistance
-            : Number(rawDistance ?? 0);
-
-        // 거리 기반 점수 (0~1, 가까울수록 1에 가까움)
-        const distanceScore = 1 - Math.min(distance / radius, 1);
-
-        // 취향 비율 (해당 카테고리 기록 비중)
-        const catCount = cat.count ?? 0;
-        const tasteRatio =
-          totalCount > 0 ? catCount / totalCount : cat.ratio ?? 0;
-
-        // 최종 점수: 취향 60% + 거리 40%
-        const score = distanceScore * 0.4 + tasteRatio * 0.6;
-
-        allCandidates.push({
-          id: p.id,
-          name: p.place_name,
-          category: normalized,
-          address: p.road_address_name || p.address_name,
-          lat: Number(p.y),
-          lng: Number(p.x),
-          distanceMeters: distance,
-          score,
-        });
-      }
-    }
-  }
-
-  // 4) 후보가 전혀 없으면 한 번 정도 반경을 늘려서 재시도 (3km → 6km)
-  if (allCandidates.length === 0 && radius < 6000) {
-    console.log(
-      "[Recommend] no candidates found, retry with larger radius",
-      { radius, topCategories }
-    );
-    return getPlacesRecommendedByTaste(userId, lat, lng, 6000);
-  }
-
-  // 5) 중복 장소(이름+주소 기준) 제거 & 점수 기준 정렬
-  const uniqueMap = new Map<string, RecommendedPlace>();
-  for (const c of allCandidates) {
-    const key = `${c.name}-${c.address}`;
-    const existing = uniqueMap.get(key);
-    if (!existing || c.score > existing.score) {
-      uniqueMap.set(key, c);
-    }
-  }
-
-  const deduped = Array.from(uniqueMap.values());
-  deduped.sort((a, b) => b.score - a.score);
-
-  // 상위 20개만 반환
-  return deduped.slice(0, 20);
+  scored.sort((a, b) => b.score - a.score);
+  return scored;
 }
