@@ -60,3 +60,4 @@ coverage/
 # User uploaded files (do not commit)
 backend/uploads/
 uploads/
+.vscode
