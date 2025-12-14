@@ -158,8 +158,20 @@ const allow127001 = allowedHostnames.has('127.0.0.1');
 
 // ✅ 현재 배포 도메인(duckdns)에서 들어오는 요청은 포트 포함 여부와 무관하게 허용
 //    (학교 포트포워딩으로 17111/18111 등 포트가 바뀌어도 CORS에 걸리지 않게)
-const allowDuckdns = (origin: string) =>
-  /^https?:\/\/cloud7-taste\.duckdns\.org(?::\d+)?$/.test(origin);
+const DUCKDNS_HOST = 'cloud7-taste.duckdns.org';
+
+const allowDuckdns = (origin: string) => {
+  try {
+    const u = new URL(origin);
+    // http/https 모두 허용 + host만 정확히 고정 (포트는 상관없음)
+    return (
+      (u.protocol === 'http:' || u.protocol === 'https:') &&
+      u.hostname === DUCKDNS_HOST
+    );
+  } catch {
+    return false;
+  }
+};
 
 const corsOptions: CorsOptions = {
   /**
