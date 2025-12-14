@@ -138,9 +138,28 @@ app.use(cookieParser());
  * - 프론트에서도 fetch/axios 요청 시 반드시 `withCredentials: true`를 설정해야
  *   세션 쿠키가 함께 전송됩니다.
  */
-const allowedOrigins = env.CORS_ORIGIN.split(',')
+const allowedOrigins = (env.CORS_ORIGIN ?? '')
+  .split(',')
   .map((s) => s.trim())
   .filter(Boolean); // .env 문자열을 배열로 변환
+
+// ✅ 포트가 달라도 같은 호스트면 허용(예: https://cloud7-taste.duckdns.org:17111)
+const allowedHostnames = new Set<string>();
+for (const o of allowedOrigins) {
+  try {
+    allowedHostnames.add(new URL(o).hostname);
+  } catch {
+    // ignore invalid URL entries
+  }
+}
+
+const allowLocalhost = allowedHostnames.has('localhost');
+const allow127001 = allowedHostnames.has('127.0.0.1');
+
+// ✅ 현재 배포 도메인(duckdns)에서 들어오는 요청은 포트 포함 여부와 무관하게 허용
+//    (학교 포트포워딩으로 17111/18111 등 포트가 바뀌어도 CORS에 걸리지 않게)
+const allowDuckdns = (origin: string) =>
+  /^https?:\/\/cloud7-taste\.duckdns\.org(?::\d+)?$/.test(origin);
 
 const corsOptions: CorsOptions = {
   /**
@@ -154,25 +173,32 @@ const corsOptions: CorsOptions = {
       return callback(null, true);
     }
 
-    // 1) .env에 명시된 허용 오리진인지 확인
+    // ✅ 0) 현재 배포 도메인(duckdns)은 포트 포함 여부와 무관하게 허용
+    if (allowDuckdns(origin)) {
+      return callback(null, true);
+    }
+
+    // 1) .env에 명시된 허용 오리진인지 확인(정확히 일치)
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
 
-    // 2) localhost/127.0.0.1 개발 편의 허용
-    //    (둘 다 .env에 넣는 것을 권장하지만, 일부 예외 상황을 위해 보조 로직 추가)
-    const allowLocalhost = allowedOrigins.some((o) =>
-      o.startsWith('http://localhost:'),
-    );
-    const allow127001 = allowedOrigins.some((o) =>
-      o.startsWith('http://127.0.0.1:'),
-    );
+    // 1-1) 같은 호스트면(포트가 달라도) 허용
+    try {
+      const u = new URL(origin);
+      if (allowedHostnames.has(u.hostname)) {
+        return callback(null, true);
+      }
 
-    if (origin.startsWith('http://localhost:') && allowLocalhost) {
-      return callback(null, true);
-    }
-    if (origin.startsWith('http://127.0.0.1:') && allow127001) {
-      return callback(null, true);
+      // 2) localhost/127.0.0.1 개발 편의 허용
+      if (u.hostname === 'localhost' && allowLocalhost) {
+        return callback(null, true);
+      }
+      if (u.hostname === '127.0.0.1' && allow127001) {
+        return callback(null, true);
+      }
+    } catch {
+      // origin 파싱 실패 시 아래에서 차단
     }
 
     // 3) 명시적으로 허용되지 않은 오리진 → 차단
