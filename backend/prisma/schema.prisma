@@ -21,19 +21,14 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  // 내가 작성한 TasteRecord
   tasteRecords TasteRecord[]
 
-  // 내가 만든 길드
-  guilds Guild[]
+  guilds            Guild[]
+  guildMemberships  GuildMembership[]
 
-  // 내가 가입한 길드
-  guildMemberships GuildMembership[]
-
-  // 위치 기반 기능
-  stays           Stay[]             // 유저가 머물렀던 장소들
-  recommendations Recommendation[]   // 유저에게 추천된 장소들
-  liveLocation    LiveLocation?      // 현재 위치 (있을 수도 있고 없을 수도)
+  stays             Stay[]
+  recommendations   Recommendation[]
+  liveLocation      LiveLocation?   // ✅ 현재 위치 (1:1)
 }
 
 /**
@@ -47,13 +42,14 @@ model TasteRecord {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   title      String
-  desc       String?   // caption
-  content    String?   // 상세 내용
+  desc       String?
+  content    String?
   recordedAt DateTime?
   category   String
   tagsJson   String?
 
   thumb     String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -72,7 +68,7 @@ enum GuildMembershipStatus {
 
 /**
  * ───────────────────────────────
- * GUILD MEMBERSHIP
+ * GUILD MEMBERSHIP (조인 테이블)
  * ────────────────────────────────
  */
 model GuildMembership {
@@ -106,7 +102,8 @@ model Guild {
   ownerId Int
   owner   User @relation(fields: [ownerId], references: [id])
 
-  memberships GuildMembership[]
+  memberships     GuildMembership[]
+  recommendations Recommendation[]   // ✅ 길드 추천 (옵션)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -130,11 +127,10 @@ model Stay {
   startTime DateTime
   endTime   DateTime
 
-  // 카카오 장소 + 카테고리 정보
   kakaoPlaceId      String?
   categoryName      String?
   categoryGroupCode String?
-  mappedCategory    String?   // '영화' | '공연' | ...
+  mappedCategory    String?
 
   createdAt DateTime @default(now())
 
@@ -146,16 +142,40 @@ model Stay {
 
 /**
  * ───────────────────────────────
- * RECOMMENDATION (개인 추천)
+ * LIVE LOCATION (실시간 위치)
+ * ────────────────────────────────
+ */
+model LiveLocation {
+  userId    Int      @id
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  lat       Float?
+  lng       Float?
+
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+/**
+ * ───────────────────────────────
+ * RECOMMENDATION (장소 추천)
  * ────────────────────────────────
  */
 model Recommendation {
   id        Int      @id @default(autoincrement())
 
+  // 개인 추천
   userId    Int
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // stay는 옵션 (없어도 됨) : 방문한 뒤에 붙여줄 수 있음
+  // 연맹 추천
+  guildId   Int?
+  guild     Guild?   @relation(fields: [guildId], references: [id])
+
+  // PERSONAL | GUILD
+  source    String   @default("PERSONAL")
+
+  // stay는 옵션 (없어도 됨)
   stayId    Int?
   stay      Stay?    @relation(fields: [stayId], references: [id], onDelete: Cascade)
 
@@ -163,33 +183,21 @@ model Recommendation {
   name              String
   categoryName      String?
   categoryGroupCode String?
-  mappedCategory    String   // '영화' | '공연' | ...
+  mappedCategory    String   // '영화' | '공연' | ... | '식당'
 
-  x         Float   // 경도
-  y         Float   // 위도
-  score     Float   // 취향 가중치 점수
+  x         Float
+  y         Float
+  distanceMeters Float?      // ✅ 현재 위치로부터 거리(m)
+
+  score     Float
+
+  roadAddress       String?
+  address           String?
+  phone             String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([userId, kakaoPlaceId, stayId])
   @@index([userId, score])
-}
-
-/**
- * ───────────────────────────────
- * LIVE LOCATION (실시간 위치)
- * ────────────────────────────────
- */
-model LiveLocation {
-  id       Int      @id @default(autoincrement())
-
-  userId   Int      @unique
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  lat      Float
-  lng      Float
-  updatedAt DateTime @updatedAt
-
-  @@index([updatedAt])
 }

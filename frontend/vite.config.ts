@@ -14,7 +14,7 @@ export default defineConfig({
     proxy: {
       '/api': {
         // 개발할 때도 클라우드에 올려둔 실제 백엔드로 프록시
-        target: 'http://113.198.66.75:13111',
+        target: 'http://localhost:3000',
         changeOrigin: true,
         secure: false,
       },
