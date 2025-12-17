@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import SignupModal from "@/components/SignupModal";
+import NotificationBell from "@/components/NotificationBell";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/store/authStore";
 
@@ -165,6 +166,7 @@ export default function HeaderNav({
             <div className="ml-auto flex items-center gap-2 md:gap-3">
               {user ? (
                 <>
+                  <NotificationBell />
                   <span
                     className="hidden md:inline text-sm text-stone-600 truncate max-w-[160px]"
                     title={user?.email ?? ""}

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { TasteRecordItem } from "@/types/type";
 import { buildUrl } from "@/api/apiClient";
+import toast from "react-hot-toast";
 
 /**
  * 취향 기록 작성 인라인 폼
@@ -201,10 +202,9 @@ export default function TasteRecordModal({
       setImageFile(null);
       setImagePreview(null);
 
-      alert("기록이 저장되었습니다.");
+      toast.success("기록이 저장되었습니다.");
       onClose();
     } catch (error) {
-      console.error("맛 기록 저장 실패", error);
       setErrorMessage(
         "기록 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
       );

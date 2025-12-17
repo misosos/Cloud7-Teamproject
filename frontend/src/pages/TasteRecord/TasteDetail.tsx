@@ -18,6 +18,7 @@
 //  - 태그는 작은 배지 형태로 반복 렌더링합니다.
 
 import { useParams, Link, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { useEffect, useState } from "react";
 import apiClient, { buildUrl } from "@/api/apiClient";
 import type { TasteRecordItem } from "@/types/type";
@@ -101,8 +102,7 @@ export default function TasteDetail() {
       // 삭제 성공 시 취향 기록 목록 화면으로 이동
       navigate("/취향기록", { replace: true });
     } catch (error) {
-      console.error("[TasteDetail] 삭제 실패", error);
-      alert("삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+      toast.error("삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.");
     }
   };
 

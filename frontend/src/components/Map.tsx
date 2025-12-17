@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import toast from "react-hot-toast";
 
 declare global {
   interface Window {
@@ -78,13 +79,12 @@ const KakaoMap = () => {
     });
 
     const data = await res.json();
-    console.log("✅ stay 저장 응답:", data);
 
     if (!res.ok) {
-      console.error("❌ stay 저장 실패", data);
+      toast.error("머무름 정보 저장에 실패했습니다.");
     }
   } catch (e) {
-    console.error("❌ stay 저장 중 에러", e);
+    toast.error("머무름 정보 저장 중 오류가 발생했습니다.");
   }
 };
 
@@ -117,7 +117,6 @@ const KakaoMap = () => {
       if (!state.saved && duration >= STAY_THRESHOLD_MS) {
         // ✅ 10분 이상 머무름 → 서버에 저장
         state.saved = true;
-        console.log("🎉 10분 머무름 감지! 서버에 저장 시도");
         saveStayToServer(state.startLat, state.startLng, state.startTime, state.lastTime);
       }
     } else {
@@ -186,10 +185,7 @@ const KakaoMap = () => {
             handleStayLogic(newPos, pos.timestamp);
           },
           (err) => {
-            console.error("📵 위치 권한/가져오기 실패", err);
-            alert(
-              `위치 가져오기 실패\ncode: ${err.code}\nmessage: ${err.message}`
-            );
+            toast.error(`위치 가져오기 실패: ${err.message || "알 수 없는 오류"}`);
           },
           {
             enableHighAccuracy: true,
@@ -198,7 +194,7 @@ const KakaoMap = () => {
           }
         );
       } else {
-        console.warn("이 브라우저는 geolocation을 지원하지 않습니다.");
+        toast.error("이 브라우저는 위치 서비스를 지원하지 않습니다.");
       }
     };
 
@@ -213,7 +209,7 @@ const KakaoMap = () => {
         window.kakao.maps.load(initMap);
       };
       script.onerror = () => {
-        console.error("❌ Kakao SDK 스크립트 로드 실패");
+        toast.error("지도 스크립트 로드에 실패했습니다.");
       };
       document.head.appendChild(script);
     } else {
@@ -233,7 +229,7 @@ const KakaoMap = () => {
     if (!mapInstanceRef.current) return;
 
     if (!userPos) {
-      alert("아직 현재 위치를 가져오지 못했습니다. 잠시 후 다시 시도해주세요.");
+      toast.error("아직 현재 위치를 가져오지 못했습니다. 잠시 후 다시 시도해주세요.");
       return;
     }
 
@@ -257,20 +253,18 @@ const KakaoMap = () => {
       });
 
       if (!res.ok) {
-        console.error("❌ 백엔드 응답 에러", await res.text());
-        alert("경로 요청에 실패했습니다.");
+        toast.error("경로 요청에 실패했습니다.");
         return;
       }
 
       const data = await res.json();
-      console.log("🛰 Kakao Mobility 응답", data);
 
       const kakao = window.kakao;
       const map = mapInstanceRef.current;
 
       const routes = data.routes;
       if (!routes || routes.length === 0) {
-        alert("경로 정보를 찾지 못했습니다.");
+        toast.error("경로 정보를 찾지 못했습니다.");
         return;
       }
 
@@ -307,8 +301,7 @@ const KakaoMap = () => {
       path.forEach((p) => bounds.extend(p));
       map.setBounds(bounds);
     } catch (err) {
-      console.error("경로 요청/그리기 중 오류", err);
-      alert("경로를 불러오는 중 오류가 발생했습니다.");
+      toast.error("경로를 불러오는 중 오류가 발생했습니다.");
     } finally {
       setLoadingRoute(false);
     }

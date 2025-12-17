@@ -17,6 +17,8 @@ import {
   type GuildListItem,
   type GuildTag,
 } from "@/services/guildApi";
+import folderImage from "@/assets/ui/folder.png";
+import { resolveImageUrl } from "@/api/apiClient";
 
 const GuildHome: React.FC = () => {
   const navigate = useNavigate();
@@ -77,6 +79,11 @@ const GuildHome: React.FC = () => {
   const [loadingGuilds, setLoadingGuilds] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [activeTag, setActiveTag] = useState<GuildTag | "전체">("전체");
+  
+  // 연맹 미션 상태
+  const [completedMissions, setCompletedMissions] = useState<any[]>([]);
+  const [loadingMissions, setLoadingMissions] = useState(false);
+  const [missionPage, setMissionPage] = useState(1); // 연맹 미션 페이지네이션
 
   //  연맹 목록 불러오기 함수
   const loadGuilds = async () => {
@@ -95,6 +102,35 @@ const GuildHome: React.FC = () => {
   useEffect(() => {
     loadGuilds();
   }, []);
+
+  // 연맹 미션 목록 불러오기
+  const loadCompletedMissions = async () => {
+    if (!hasGuild || !guild) return;
+    
+    setLoadingMissions(true);
+    try {
+      const response = await fetch(`/api/guilds/${guild.id}/missions/completed`, {
+        credentials: "include",
+      });
+      if (response.ok) {
+        const json = await response.json();
+        if (json.ok && json.data) {
+          setCompletedMissions(json.data);
+        }
+      }
+    } catch (err) {
+      console.error("완료된 미션 목록 불러오기 실패:", err);
+    } finally {
+      setLoadingMissions(false);
+    }
+  };
+
+  // 연맹이 있을 때 미션 목록 불러오기
+  useEffect(() => {
+    if (hasGuild && guild) {
+      loadCompletedMissions();
+    }
+  }, [hasGuild, guild]);
 
   //  연맹 목록 필터링 (현재 연맹도 포함하되, 내가 만든 연맹인지 표시)
   const otherGuilds = useMemo(() => {
@@ -417,7 +453,7 @@ const GuildHome: React.FC = () => {
                 <div className="w-full h-full rounded-lg bg-gradient-to-br from-[#8b5a2b] to-[#5a3315] border-2 border-[#6b4e2f] shadow-[0_12px_40px_rgba(0,0,0,0.6),inset_0_2px_4px_rgba(255,255,255,0.1)] flex items-center justify-center overflow-hidden">
                   {guild.emblemUrl ? (
                     <img
-                      src={guild.emblemUrl}
+                      src={resolveImageUrl(guild.emblemUrl) || ''}
                       alt={`${guild.name} 연맹 이미지`}
                       className="w-full h-full object-cover"
                     />
@@ -500,6 +536,8 @@ const GuildHome: React.FC = () => {
                 )}
               </div>
             </article>
+
+           
 
             
             <section className="mt-10">
