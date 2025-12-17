@@ -563,6 +563,7 @@ export type GuildRecordDTO = {
   extraImages: string[];
   hashtags: string[];
   missionId: string | null; // 규칙: missionId가 null이면 개인 도감 기록, null이 아니면 연맹 미션 기록
+  kakaoPlaceId: string | null; // 추천 장소 달성 기록인 경우 카카오 장소 ID
   createdAt: string;
   updatedAt: string;
 };
@@ -606,6 +607,7 @@ function serializeGuildRecord(record: any, user?: any): GuildRecordDTO {
     extraImages,
     hashtags,
     missionId: record.missionId ?? null, // 규칙: missionId가 null이면 개인 도감 기록, null이 아니면 연맹 미션 기록
+    kakaoPlaceId: record.kakaoPlaceId ?? null, // 추천 장소 달성 기록인 경우 카카오 장소 ID
     createdAt: record.createdAt
       ? new Date(record.createdAt).toISOString()
       : new Date().toISOString(),
@@ -633,6 +635,7 @@ export async function createGuildRecord(
     mainImage?: string | null;
     extraImages?: string[];
     hashtags?: string[];
+    kakaoPlaceId?: string; // 추천 장소 달성 기록인 경우 카카오 장소 ID
   },
 ): Promise<GuildRecordDTO> {
   // 길드 존재 확인 및 멤버십 확인
@@ -663,11 +666,93 @@ export async function createGuildRecord(
     mainImage,
     extraImages,
     hashtags,
+    kakaoPlaceId,
   } = payload;
 
   // 트랜잭션으로 기록 생성과 점수 업데이트를 함께 처리
   const result = await prisma.$transaction(async (tx) => {
-    // 1. 도감 기록 생성 (개인 도감 기록이므로 missionId는 null)
+    // 추천 장소 기록인 경우 5분 이상 머문 기록 확인
+    if (kakaoPlaceId) {
+      const MIN_STAY_MS = 5 * 60 * 1000; // 5분
+
+      // 해당 장소에서 5분 이상 머문 Stay 기록 확인
+      const stay = await tx.stay.findFirst({
+        where: {
+          userId,
+          kakaoPlaceId,
+        },
+        orderBy: {
+          endTime: "desc", // 가장 최근 방문 기록
+        },
+      });
+
+      if (!stay) {
+        const err = new Error("MIN_STAY_NOT_MET");
+        (err as any).code = "MIN_STAY_NOT_MET";
+        (err as any).message = "해당 장소에서 최소 5분 이상 머물러야 기록을 작성할 수 있습니다.";
+        throw err;
+      }
+
+      // Stay의 머문 시간 계산
+      const durationMs = stay.endTime.getTime() - stay.startTime.getTime();
+      
+      if (durationMs < MIN_STAY_MS) {
+        const err = new Error("MIN_STAY_NOT_MET");
+        (err as any).code = "MIN_STAY_NOT_MET";
+        (err as any).message = "해당 장소에서 최소 5분 이상 머물러야 기록을 작성할 수 있습니다.";
+        throw err;
+      }
+    }
+
+    // 1. 점수 지급 판정 (기록 생성 전에 확인)
+    let pointsToAward = 10; // 기본: 일반 기록 +10점
+
+    // 추천 장소 달성 기록인 경우 (+50점)
+    if (kakaoPlaceId) {
+      // 달성 조건 확인:
+      // 1) Recommendation 테이블에 해당 kakaoPlaceId가 있어야 함
+      // 2) 이 장소에 대한 기록을 이미 작성했는지 확인 (중복 방지)
+      const recommendation = await tx.recommendation.findFirst({
+        where: {
+          userId,
+          kakaoPlaceId,
+        },
+      });
+
+      if (recommendation) {
+        // 이미 이 장소에 대한 기록을 작성했는지 확인 (중복 방지)
+        // 현재 생성하려는 기록을 제외하고 확인
+        const existingRecord = await tx.guildRecord.findFirst({
+          where: {
+            userId,
+            guildId,
+            kakaoPlaceId,
+          },
+        });
+
+        if (!existingRecord) {
+          // 첫 기록 작성이면 +50점 지급
+          pointsToAward = 50;
+          console.log(
+            `✅ [GuildRecord] 추천 장소 달성 기록: userId=${userId}, guildId=${guildId}, kakaoPlaceId=${kakaoPlaceId}, +50점 지급`,
+          );
+        } else {
+          console.log(
+            `⚠️ [GuildRecord] 중복 기록 감지: userId=${userId}, guildId=${guildId}, kakaoPlaceId=${kakaoPlaceId}, +10점만 지급`,
+          );
+        }
+      } else {
+        console.log(
+          `⚠️ [GuildRecord] Recommendation 없음: userId=${userId}, kakaoPlaceId=${kakaoPlaceId}, +10점만 지급`,
+        );
+      }
+    } else {
+      console.log(
+        `ℹ️ [GuildRecord] 일반 기록: userId=${userId}, guildId=${guildId}, +10점 지급`,
+      );
+    }
+
+    // 2. 도감 기록 생성 (개인 도감 기록이므로 missionId는 null)
     const record = await tx.guildRecord.create({
       data: {
         guildId,
@@ -690,20 +775,35 @@ export async function createGuildRecord(
             : null,
         hashtagsJson:
           hashtags && hashtags.length > 0 ? JSON.stringify(hashtags) : null,
+        kakaoPlaceId: kakaoPlaceId ?? null,
       },
     });
 
-    // 2. 사용자 점수 업데이트 (10점 추가)
+    // 3. Stay가 있으면 recommendationPointsAwardedAt 업데이트 (중복 방지)
+    if (kakaoPlaceId && pointsToAward === 50) {
+      await tx.stay.updateMany({
+        where: {
+          userId,
+          kakaoPlaceId,
+          recommendationPointsAwardedAt: null,
+        },
+        data: {
+          recommendationPointsAwardedAt: new Date(),
+        },
+      });
+    }
+
+    // 3. 사용자 점수 업데이트
     await tx.guildScore.upsert({
       where: { userId_guildId: { userId, guildId } },
       create: {
         userId,
         guildId,
-        score: 10,
+        score: pointsToAward,
       },
       update: {
         score: {
-          increment: 10,
+          increment: pointsToAward,
         },
       },
     });

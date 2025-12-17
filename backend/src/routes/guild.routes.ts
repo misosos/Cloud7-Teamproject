@@ -826,6 +826,7 @@ router.post(
         mainImage,
         extraImages,
         hashtags,
+        kakaoPlaceId,
       } = req.body as {
         title?: string;
         desc?: string;
@@ -836,6 +837,7 @@ router.post(
         mainImage?: string | null;
         extraImages?: string[];
         hashtags?: string[];
+        kakaoPlaceId?: string;
       };
 
       if (!title || !title.trim()) {
@@ -856,6 +858,7 @@ router.post(
         mainImage,
         extraImages,
         hashtags,
+        kakaoPlaceId,
       });
 
       return res.status(201).json({ ok: true, data });
@@ -874,6 +877,13 @@ router.post(
             ok: false,
             error: "FORBIDDEN",
             message: "연맹 멤버만 도감을 추가할 수 있습니다.",
+          });
+        }
+        if (code === "MIN_STAY_NOT_MET") {
+          return res.status(400).json({
+            ok: false,
+            error: "BAD_REQUEST",
+            message: err.message || "해당 장소에서 최소 5분 이상 머물러야 기록을 작성할 수 있습니다.",
           });
         }
       }

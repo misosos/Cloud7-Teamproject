@@ -49,7 +49,8 @@ export interface UnifiedRecommendationsResponse {
   count: number;
   pending: RecommendationRow[];
   achieved: (RecommendationRow & {
-    stay?: { endTime?: string | null } | null;
+    stay?: { endTime?: string | null; awardedPoints?: number | null } | null;
+    hasRecord?: boolean; // ✅ 이미 작성한 기록이 있는지 여부
   })[];
 }
 

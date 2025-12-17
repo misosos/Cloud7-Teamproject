@@ -439,11 +439,11 @@ const GuildRoom: React.FC = () => {
                 <span className="text-[#f4d7aa]">{thisMonthDexCount}</span>개
               </p>
               <p className="text-[#d4a574] font-bold">
-                🔄 진행 중 도감{" "}
+              🏃 진행 중 도감{" "}
                 <span className="text-[#f4d7aa]">{ongoingDexCount}</span>개
               </p>
               <p className="text-[#d4a574] font-bold">
-                ✅ 달성 완료 도감{" "}
+              🔥 달성 완료 도감{" "}
                 <span className="text-[#f4d7aa]">{completedDexCount}</span>개
               </p>
             </div>
@@ -547,7 +547,7 @@ const GuildRoom: React.FC = () => {
             {/* 진행중인 미션 섹션 */}
           {guildMissions.length > 0 && (
             <div>
-              <h3 className="text-lg font-black mb-3 text-[#6b4e2f] tracking-wide">🔄 진행중인 미션</h3>
+              <h3 className="text-lg font-black mb-3 text-[#6b4e2f] tracking-wide">🏃 진행중인 미션</h3>
               <div className="relative pb-8">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-8">
                   {/* 진행 중인 미션 폴더 */}
@@ -640,7 +640,7 @@ const GuildRoom: React.FC = () => {
            
             <div>
               <h3 className="text-lg font-black mb-3 text-[#6b4e2f] tracking-wide">
-                ✅ 개인 도감 기록 {(() => {
+              🔥 개인 도감 기록 {(() => {
                   // 규칙: missionId가 null이거나 undefined인 기록만 개인 도감 기록으로 표시
                   // missionId가 있는 기록(연맹 미션 후기)은 절대 개인 도감 기록 섹션에 나타나면 안 됨
                   const personalRecords = guildRecords.filter((r) => r.missionId === null || r.missionId === undefined);

@@ -141,8 +141,8 @@ function distanceMeters(
  *  - 그 후보들 중 가장 가까운 하나를 반환
  *  - 없으면 null
  */
-const SEARCH_RADIUS = 200; // 카카오 검색 반경 (m)
-const MATCH_RADIUS = 50;   // 이 거리 이내여야 "그 장소에 있다"고 인정
+const SEARCH_RADIUS = 1000; // 카카오 검색 반경 (1km)
+const MATCH_RADIUS = 1000;   // 이 거리 이내여야 "그 장소에 있다"고 인정 (1km)
 
 async function findStayedPlace(
   lat: number,
@@ -199,7 +199,7 @@ async function findStayedPlace(
 /**
  * POST /api/stays
  * body: { lat: number, lng: number, startTime: number, endTime: number }
- *  - 10분 머무름 감지 시 한 번 호출
+ *  - 5분 머무름 감지 시 한 번 호출
  *  - 현재 위치에 "실제로 있는" 장소의 카테고리가
  *    7개 추적 카테고리 중 하나일 때만 DB에 저장
  */
@@ -267,6 +267,47 @@ router.post("/", authRequired, async (req: Request, res: Response) => {
         mappedCategory: stayedPlace.mappedCategory,
       },
     });
+
+    // ✅ 이 머문 장소가 개인 Recommendation 테이블에 있으면 → 방문한 것으로 연결(stayId 세팅)
+    // ✅ 없으면 자동으로 Recommendation 생성 (achieved 목록에 표시되도록)
+    const existingRec = await prisma.recommendation.findFirst({
+      where: {
+        userId: userIdNum,
+        kakaoPlaceId: stayedPlace.id,
+      },
+    });
+
+    if (existingRec) {
+      // 이미 있으면 stayId만 업데이트
+      await prisma.recommendation.update({
+        where: { id: existingRec.id },
+        data: {
+          stayId: stay.id,
+        },
+      });
+    } else {
+      // 없으면 새로 생성 (score는 기본값 0)
+      await prisma.recommendation.create({
+        data: {
+          userId: userIdNum,
+          stayId: stay.id,
+          kakaoPlaceId: stayedPlace.id,
+          name: stayedPlace.name,
+          categoryName: stayedPlace.categoryName,
+          categoryGroupCode: stayedPlace.categoryGroupCode,
+          mappedCategory: stayedPlace.mappedCategory,
+          x: stayedPlace.x,
+          y: stayedPlace.y,
+          score: 0,
+        },
+      });
+      console.log(
+        `✨ [RecommendationCreated] user=${userIdNum}, kakaoPlaceId=${stayedPlace.id}, place=${stayedPlace.name}`,
+      );
+    }
+
+    // ✅ 점수 지급은 기록 작성 시에만 지급 (GuildRecord 생성 시)
+    // Stay 생성 시에는 자동 점수 지급하지 않음
 
     return res.status(201).json({ ok: true, stay });
   } catch (err) {
