@@ -5,6 +5,7 @@ import HeaderNav from "@/components/HeaderNav";
 import toast from "react-hot-toast";
 import { joinGuildBackend, getGuildById, type GuildDTO } from "@/services/guildService";
 import { useGuildStatus } from "@/hooks/useGuildStatus";
+import { resolveImageUrl } from "@/api/apiClient";
 
 const GuildDetail: React.FC = () => {
   const params = useParams<{ guildId: string }>();
@@ -136,7 +137,7 @@ const GuildDetail: React.FC = () => {
               <div className="w-full h-full rounded-lg bg-gradient-to-br from-[#8b5a2b] to-[#5a3315] border-2 border-[#6b4e2f] shadow-[0_12px_40px_rgba(0,0,0,0.6),inset_0_2px_4px_rgba(255,255,255,0.1)] flex items-center justify-center overflow-hidden transition-all duration-300 group-hover:shadow-[0_16px_50px_rgba(201,169,97,0.5),inset_0_2px_4px_rgba(255,255,255,0.15)] group-hover:scale-[1.02]">
                 {guild.emblemUrl ? (
                   <img
-                    src={guild.emblemUrl}
+                    src={resolveImageUrl(guild.emblemUrl) || ''}
                     alt={`${guild.name} 연맹 엠블럼`}
                     className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                   />
@@ -341,7 +342,7 @@ const GuildDetail: React.FC = () => {
               <div className="flex items-center gap-3">
                 {guild.emblemUrl ? (
                   <img
-                    src={guild.emblemUrl}
+                    src={resolveImageUrl(guild.emblemUrl) || ''}
                     alt={guild.name}
                     className="w-16 h-16 rounded-lg object-cover border-2 border-[#6b4e2f] shadow-[0_4px_12px_rgba(0,0,0,0.5)]"
                   />

@@ -31,6 +31,7 @@ import GuildManage from "@/pages/Guild/GuildManage";
 import GuildExplore from "@/pages/Guild/GuildExplore";
 import GuildDetail from "@/pages/Guild/GuildDetail";
 import GuildRoom from "@/pages/Guild/GuildRoom";
+import MissionRecordsPage from "@/pages/Guild/MissionRecordsPage";
 import MyGuildPage from "@/pages/Dashboard/MyGuild";
 import MapPage from "@/pages/Map/MapPage";                                // 카카오맵 테스트 페이지(디버깅용)
 import TasteCategoryDashboard from "@/components/TasteCategoryDashboard";
@@ -123,6 +124,7 @@ export default function App() {
               <Route path="/guild/explore" element={<GuildExplore />} />
               <Route path="/guild/:guildId" element={<GuildDetail />} />
               <Route path="/guild/:guildId/room" element={<GuildRoom />} />
+              <Route path="/guild/:guildId/missions/:missionId/records" element={<MissionRecordsPage />} />
               <Route path="/guild/:guildId/manage" element={<GuildManage />} />
               <Route path="/guild/my" element={<MyGuildPage />} />
               <Route path="/taste-dashboard" element={<TasteCategoryDashboard />} />

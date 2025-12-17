@@ -57,6 +57,12 @@ fs.mkdirSync(tasteRecordsUploadDir, { recursive: true });
 const guildsUploadDir = path.resolve(__dirname, '..', '..', 'uploads', 'guilds');
 fs.mkdirSync(guildsUploadDir, { recursive: true });
 
+
+
+// 연맹 도감 기록 이미지 업로드 디렉터리 경로 (…/backend/uploads/guild-records)
+const guildRecordsUploadDir = path.resolve(__dirname, '..', '..', 'uploads', 'guild-records');
+fs.mkdirSync(guildRecordsUploadDir, { recursive: true });
+
 // ---------------------------------------------------------------------------
 // 공통 파일명 생성 로직
 // ---------------------------------------------------------------------------
@@ -67,7 +73,6 @@ const createFilename = (originalName: string) => {
   return `${base}-${unique}${ext}`;
 };
 
-// ---------------------------------------------------------------------------
 // 파일 저장 방식 설정 (taste-records용)
 // ---------------------------------------------------------------------------
 const tasteRecordsStorage = multer.diskStorage({
@@ -80,6 +85,7 @@ const tasteRecordsStorage = multer.diskStorage({
     cb(null, createFilename(file.originalname));
   },
 });
+
 
 // ---------------------------------------------------------------------------
 // 파일 저장 방식 설정 (guilds용)
@@ -94,12 +100,26 @@ const guildsStorage = multer.diskStorage({
 });
 
 // ---------------------------------------------------------------------------
+// 파일 저장 방식 설정 (guild-records용)
+// ---------------------------------------------------------------------------
+const guildRecordsStorage = multer.diskStorage({
+  // 파일이 저장될 폴더
+  destination: (_req, _file, cb) => {
+    cb(null, guildRecordsUploadDir);
+  },
+  // 저장될 파일명 규칙
+  filename: (_req, file, cb) => {
+    cb(null, createFilename(file.originalname));
+  },
+});
+
+// ---------------------------------------------------------------------------
 // Multer 인스턴스
 //  - 필요하다면 추후 이미지 용량/타입 제한도 여기서 설정 가능
 // ---------------------------------------------------------------------------
 const uploadTasteRecords = multer({ storage: tasteRecordsStorage });
 const uploadGuilds = multer({ storage: guildsStorage });
-
+const uploadGuildRecords = multer({ storage: guildRecordsStorage });
 const router = Router();
 
 // ---------------------------------------------------------------------------
@@ -156,6 +176,30 @@ router.post(
       next(err);
     }
   },
+);
+
+// POST /api/uploads/guild-records
+router.post(
+  "/guild-records",
+  authRequired,
+  uploadGuildRecords.single("file"), // 프론트에서 formData.append("file", ...) 로 보낼 예정
+  (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ ok: false, error: "NO_FILE" });
+      }
+
+      // 프론트에서 접근 가능한 공개 URL (/uploads/.. 로 매핑 예정)
+      const publicUrl = `/uploads/guild-records/${req.file.filename}`;
+
+      return res.status(201).json({
+        ok: true,
+        url: publicUrl,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
 );
 
 export default router;

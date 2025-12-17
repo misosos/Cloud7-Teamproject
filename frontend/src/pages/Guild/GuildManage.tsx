@@ -8,6 +8,7 @@ import {
   rejectMembership,
   type PendingMembership,
 } from "@/services/guildService";
+import toast from "react-hot-toast";
 const GuildManage: React.FC = () => {
   const { guildId } = useParams<{ guildId: string }>();
   const navigate = useNavigate();
@@ -53,8 +54,7 @@ const GuildManage: React.FC = () => {
       // 목록에서 제거
       setPending((prev) => prev.filter((m) => m.id !== membershipId));
     } catch (err: any) {
-      console.error(err);
-      alert(
+      toast.error(
         err?.data?.message || err?.message || "가입 신청 승인에 실패했습니다.",
       );
     } finally {
@@ -75,8 +75,7 @@ const GuildManage: React.FC = () => {
       // 목록에서 제거
       setPending((prev) => prev.filter((m) => m.id !== membershipId));
     } catch (err: any) {
-      console.error(err);
-      alert(err?.data?.message || err?.message || "가입 신청 거절에 실패했습니다.");
+      toast.error(err?.data?.message || err?.message || "가입 신청 거절에 실패했습니다.");
     } finally {
       setProcessing(null);
     }

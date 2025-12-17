@@ -26,9 +26,25 @@ model User {
   guilds            Guild[]
   guildMemberships  GuildMembership[]
 
-  stays             Stay[]
-  recommendations   Recommendation[]
-  liveLocation      LiveLocation?   // ✅ 현재 위치 (1:1)
+  // 위치 기반 기능
+  stays           Stay[]             // 유저가 머물렀던 장소들
+  recommendations Recommendation[]   // 유저에게 추천된 장소들
+  liveLocation    LiveLocation?     // ✅ 현재 위치 (1:1)
+
+  // 길드 도감 기록
+  guildRecords GuildRecord[]
+  
+  // 길드 점수
+  guildScores GuildScore[]
+
+  // 길드 도감 댓글
+  guildRecordComments GuildRecordComment[]
+
+  // 받은 알림
+  notifications Notification[] @relation("NotificationToUser")
+
+  // 보낸 알림
+  sentNotifications Notification[] @relation("NotificationFromUser")
 }
 
 /**
@@ -104,6 +120,15 @@ model Guild {
 
   memberships     GuildMembership[]
   recommendations Recommendation[]   // ✅ 길드 추천 (옵션)
+
+  // 길드 도감 기록
+  guildRecords GuildRecord[]
+
+  // 길드 미션
+  missions GuildMission[]
+
+  // 길드 점수
+  guildScores GuildScore[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -200,4 +225,138 @@ model Recommendation {
 
   @@unique([userId, kakaoPlaceId, stayId])
   @@index([userId, score])
+}
+
+/**
+ * ───────────────────────────────
+ * GUILD MISSION (연맹 미션)
+ * ────────────────────────────────
+ */
+model GuildMission {
+  id     String @id @default(cuid())
+  guildId Int
+  guild   Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+
+  title      String
+  content    String?   // 미션 설명
+  limitCount Int       // 선착순 인원
+  difficulty String?   // 난이도 (선택형)
+  mainImage  String?   // 대표 이미지 URL
+  extraImagesJson String? // 추가 이미지 배열을 JSON 문자열로 저장
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 이 미션에 대한 참여 기록들
+  records GuildRecord[]
+
+  @@index([guildId, createdAt])
+}
+
+/**
+ * ───────────────────────────────
+ * GUILD RECORD (연맹 도감 기록)
+ * ────────────────────────────────
+ */
+model GuildRecord {
+  id     String @id @default(cuid())
+  guildId Int
+  guild   Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  
+  userId Int
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // 미션 참여 기록인 경우 missionId가 있음
+  missionId String?
+  mission   GuildMission? @relation(fields: [missionId], references: [id], onDelete: SetNull)
+
+  title      String
+  desc       String?   // 한 줄 설명
+  content    String?   // 상세 내용
+  category   String?
+  recordedAt DateTime? // 사용자가 선택하는 날짜
+  rating     Int?      // 별점 (1-5)
+  mainImage  String?   // 메인 이미지 URL
+  extraImagesJson String? // 추가 이미지 배열을 JSON 문자열로 저장
+  hashtagsJson   String? // 해시태그 배열을 JSON 문자열로 저장
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 댓글
+  comments GuildRecordComment[]
+
+  @@index([guildId, createdAt])
+  @@index([userId, createdAt])
+  @@index([missionId, createdAt])
+}
+
+/**
+ * ───────────────────────────────
+ * GUILD SCORE (연맹 점수)
+ * ────────────────────────────────
+ */
+model GuildScore {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guildId   Int
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  score     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, guildId])
+  @@index([guildId, score])
+}
+
+/**
+ * ───────────────────────────────
+ * GUILD RECORD COMMENT (연맹 도감 댓글)
+ * ────────────────────────────────
+ */
+model GuildRecordComment {
+  id     String @id @default(cuid())
+  recordId String
+  record   GuildRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  
+  userId Int
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  parentCommentId String?
+  parentComment   GuildRecordComment? @relation("CommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies         GuildRecordComment[] @relation("CommentReplies")
+
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([recordId, createdAt])
+  @@index([userId, createdAt])
+  @@index([parentCommentId])
+}
+
+/**
+ * ───────────────────────────────
+ * NOTIFICATION (알림)
+ * ────────────────────────────────
+ */
+model Notification {
+  id     String @id @default(cuid())
+  userId Int
+  user   User   @relation("NotificationToUser", fields: [userId], references: [id], onDelete: Cascade)
+  
+  fromUserId Int
+  fromUser   User @relation("NotificationFromUser", fields: [fromUserId], references: [id], onDelete: Cascade)
+
+  type      String   // "COMMENT" | "REPLY" 등
+  recordId  String?  // 관련 도감 기록 ID
+  commentId String?  // 관련 댓글 ID
+  content   String?  // 알림 내용
+
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead, createdAt])
+  @@index([userId, createdAt])
 }

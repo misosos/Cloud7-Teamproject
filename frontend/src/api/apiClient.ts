@@ -30,6 +30,28 @@ export const API_BASE: string = (() => {
 //        API_ORIGIN은 "http://localhost:3000"이 됩니다.
 export const API_ORIGIN: string = API_BASE.replace(/\/api$/, '');
 
+/**
+ * 이미지 URL을 절대 경로로 변환하는 헬퍼 함수
+ * - 이미 http(s)로 시작하는 절대 URL이면 그대로 반환
+ * - /uploads/... 같은 상대 경로면 API_ORIGIN을 붙여서 절대 경로로 변환
+ */
+export function resolveImageUrl(imageUrl?: string | null): string | null {
+  if (!imageUrl) return null;
+  
+  // 이미 절대 URL이면 그대로 사용
+  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+    return imageUrl;
+  }
+  
+  // /uploads/... 같은 상대 경로면 API_ORIGIN을 붙임
+  if (imageUrl.startsWith('/')) {
+    return `${API_ORIGIN}${imageUrl}`;
+  }
+  
+  // 그 외의 경우는 일단 원본 그대로 반환
+  return imageUrl;
+}
+
 const DEFAULT_TIMEOUT =
   Number((import.meta as any).env?.VITE_API_TIMEOUT_MS) || 15000;
 

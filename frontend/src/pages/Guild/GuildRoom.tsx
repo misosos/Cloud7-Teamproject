@@ -1,9 +1,12 @@
 // frontend/src/pages/Guild/GuildRoom.tsx
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import HeaderNav from "@/components/HeaderNav";
 import Achievement from "@/components/Achievement";
 import BookCard from "@/components/BookCard";
+import GuildRecordModal from "@/components/GuildRecordModal";
+import GuildRecordDetailModal from "@/components/GuildRecordDetailModal";
+import GuildMissionModal from "@/components/GuildMissionModal";
 import toast from "react-hot-toast";
 import {
   fetchGuildDetail,
@@ -11,10 +14,15 @@ import {
 } from "@/services/guildApi";
 import { useAuthUser } from "@/store/authStore";
 import { updateGuild } from "@/services/guildService";
+import folderImage from "@/assets/ui/folder.png";
+import { resolveImageUrl } from "@/api/apiClient";
 
 const GuildRoom: React.FC = () => {
   
   const { guildId = "" } = useParams<{ guildId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const user = useAuthUser();
 
   const [data, setData] = useState<GuildDetailData | null>(null);
@@ -23,8 +31,19 @@ const GuildRoom: React.FC = () => {
   const [rightTab, setRightTab] = useState<"dex" | "ranking">("dex");
   const [uploadingImage, setUploadingImage] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [showRecordModal, setShowRecordModal] = useState(false);
+  const [showRecordDetailModal, setShowRecordDetailModal] = useState(false);
+  const [showMissionModal, setShowMissionModal] = useState(false);
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
+  const [guildRecords, setGuildRecords] = useState<any[]>([]);
+  const [guildMissions, setGuildMissions] = useState<any[]>([]); // 진행 중인 미션
+  const [completedMissions, setCompletedMissions] = useState<any[]>([]); // 완료된 미션
+  const [selectedMissionId, setSelectedMissionId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1); // 페이지네이션: 현재 페이지 (도감 기록용)
+  const [explorersPage, setExplorersPage] = useState(1); // 페이지네이션: 연맹 탐험가용 현재 페이지
+  const [deletingMissionIds, setDeletingMissionIds] = useState<Set<string>>(new Set()); // 삭제 중인 미션 ID들
 
-  // 길드 상세 목API 호출
+  // 길드 상세 목API 호출 및 도감 기록 로드
   useEffect(() => {
     if (!guildId) return;
 
@@ -40,11 +59,76 @@ const GuildRoom: React.FC = () => {
       }
 
       setData(res);
+      
+      // 도감 기록 가져오기
+      try {
+        const recordsResponse = await fetch(`/api/guilds/${guildId}/records`, {
+          credentials: "include",
+        });
+        if (recordsResponse.ok) {
+          const recordsJson = await recordsResponse.json();
+          if (recordsJson.ok && recordsJson.data) {
+            setGuildRecords(recordsJson.data);
+          }
+        }
+      } catch (err) {
+        console.error("도감 기록 로드 실패:", err);
+      }
+
+      // 미션 목록 가져오기 (진행 중인 미션만)
+      try {
+        const missionsResponse = await fetch(`/api/guilds/${guildId}/missions`, {
+          credentials: "include",
+        });
+        if (missionsResponse.ok) {
+          const missionsJson = await missionsResponse.json();
+          if (missionsJson.ok && missionsJson.data) {
+            setGuildMissions(missionsJson.data);
+          }
+        }
+      } catch (err) {
+        console.error("미션 목록 로드 실패:", err);
+      }
+
+      // 완료된 미션 목록 가져오기
+      try {
+        const completedMissionsResponse = await fetch(`/api/guilds/${guildId}/missions/completed`, {
+          credentials: "include",
+        });
+        if (completedMissionsResponse.ok) {
+          const completedMissionsJson = await completedMissionsResponse.json();
+          if (completedMissionsJson.ok && completedMissionsJson.data) {
+            setCompletedMissions(completedMissionsJson.data);
+          }
+        } else {
+          console.error("완료된 미션 목록 응답 오류:", completedMissionsResponse.status);
+        }
+      } catch (err) {
+        console.error("완료된 미션 목록 로드 실패:", err);
+      }
+
       setLoading(false);
     }
 
     load();
   }, [guildId]);
+
+  // URL 파라미터에서 recordId 확인하여 모달 열기
+  useEffect(() => {
+    // 로딩 중이면 기다림
+    if (loading) return;
+    
+    const recordId = searchParams.get("recordId");
+    if (recordId && recordId !== selectedRecordId) {
+      // recordId가 있고, 현재 선택된 recordId와 다르면 모달 열기
+      setSelectedRecordId(recordId);
+      setShowRecordDetailModal(true);
+      // URL에서 파라미터 제거 (히스토리에 남기지 않음)
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete("recordId");
+      setSearchParams(newSearchParams, { replace: true });
+    }
+  }, [location.search, loading, selectedRecordId, setSearchParams]);
 
   if (loading) {
     return (
@@ -78,6 +162,29 @@ const GuildRoom: React.FC = () => {
       user.id !== undefined &&
       Number(guild.ownerId) === Number(user.id)
   );
+
+  // -----------------------------
+  // 연맹 도감 통계 (실제 기록 기반)
+  // -----------------------------
+  // 규칙: missionId가 null/undefined 인 기록만 "개인/연맹 도감"으로 취급
+  const personalRecords = guildRecords.filter(
+    (r) => r.missionId === null || r.missionId === undefined,
+  );
+
+  const now = new Date();
+  const totalDexCount = personalRecords.length;
+  const thisMonthDexCount = personalRecords.filter((r) => {
+    if (!r.createdAt) return false;
+    const d = new Date(r.createdAt);
+    return (
+      d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+    );
+  }).length;
+  // 진행 중 도감: 진행 중인 개인 도감(inProgressBooks) + 진행 중인 연맹 미션 수
+  const ongoingDexCount = (inProgressBooks?.length || 0) + guildMissions.length;
+  // 달성 완료 도감: 완료된 개인 도감(completedBooks) + 완료된 연맹 미션 수
+  const completedDexCount =
+    (completedBooks?.length || 0) + completedMissions.length;
 
   // 데이터 리로드 함수
   const reloadData = async () => {
@@ -182,7 +289,7 @@ const GuildRoom: React.FC = () => {
               <div className="w-full h-full rounded-lg bg-gradient-to-br from-[#8b5a2b] to-[#5a3315] flex items-center justify-center shadow-[0_12px_40px_rgba(0,0,0,0.6),inset_0_2px_4px_rgba(255,255,255,0.1)] overflow-hidden transition-all duration-300 group-hover:shadow-[0_16px_50px_rgba(201,169,97,0.5),inset_0_2px_4px_rgba(255,255,255,0.15)] group-hover:scale-105 border-2 border-[#6b4e2f]">
                 {guild.emblemUrl ? (
                   <img
-                    src={guild.emblemUrl}
+                    src={resolveImageUrl(guild.emblemUrl) || ''}
                     alt={`${guild.name} 연맹 이미지`}
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                   />
@@ -227,11 +334,17 @@ const GuildRoom: React.FC = () => {
 
             
             <div className="flex gap-3 mt-1 justify-center">
-              <button className="flex-1 py-2.5 rounded-lg bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white text-sm font-black tracking-wide hover:from-[#9b7f57] hover:to-[#7b5e3f] transition-all shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)] border border-[#c9a961]/30 active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]">
+              <button
+                onClick={() => setShowRecordModal(true)}
+                className="flex-1 py-2.5 rounded-lg bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white text-sm font-black tracking-wide hover:from-[#9b7f57] hover:to-[#7b5e3f] transition-all shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)] border border-[#c9a961]/30 active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]"
+              >
                 📜 도감 추가
               </button>
-              <button className="flex-1 py-2.5 rounded-lg bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] text-sm font-black tracking-wide hover:from-[#5a4430] hover:to-[#4a3828] transition-all shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)] border-2 border-[#6b4e2f] active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]">
-                ⚔️ 도감 달성
+              <button
+                onClick={() => setShowMissionModal(true)}
+                className="flex-1 py-2.5 rounded-lg bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] text-sm font-black tracking-wide hover:from-[#5a4430] hover:to-[#4a3828] transition-all shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)] border-2 border-[#6b4e2f] active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]"
+              >
+                ⚔️ 연맹 미션 추가
               </button>
             </div>
           </div>
@@ -254,7 +367,7 @@ const GuildRoom: React.FC = () => {
                 <div className="w-full h-full rounded-lg bg-gradient-to-br from-[#8b5a2b] to-[#5a3315] border-2 border-[#6b4e2f] shadow-[0_12px_40px_rgba(0,0,0,0.6),inset_0_2px_4px_rgba(255,255,255,0.1)] overflow-hidden transition-all duration-300 group-hover:shadow-[0_16px_50px_rgba(201,169,97,0.5),inset_0_2px_4px_rgba(255,255,255,0.15)] group-hover:scale-[1.02]">
                   {guild.emblemUrl ? (
                     <img
-                      src={guild.emblemUrl}
+                      src={resolveImageUrl(guild.emblemUrl) || ''}
                       alt={`${guild.name} 연맹 엠블럼`}
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                     />
@@ -317,47 +430,157 @@ const GuildRoom: React.FC = () => {
             </div>
 
             <div className="bg-gradient-to-b from-[#5a3e25] to-[#4a3420] rounded-lg p-5 text-base space-y-2 border-2 border-[#6b4e2f] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4),0_8px_24px_rgba(0,0,0,0.4)]">
-              <p className="text-[#d4a574] font-bold">📊 총 연맹 도감 수 <span className="text-[#f4d7aa]">{guild.stats.totalDex}</span>개</p>
-              <p className="text-[#d4a574] font-bold">📅 이달의 도감 <span className="text-[#f4d7aa]">{guild.stats.thisMonthDex}</span>개</p>
-              <p className="text-[#d4a574] font-bold">🔄 진행 중 도감 <span className="text-[#f4d7aa]">{guild.stats.ongoingDex}</span>개</p>
-              <p className="text-[#d4a574] font-bold">✅ 달성 완료 도감 <span className="text-[#f4d7aa]">{guild.stats.completedDex}</span>개</p>
+              <p className="text-[#d4a574] font-bold">
+                📊 총 연맹 도감 수{" "}
+                <span className="text-[#f4d7aa]">{totalDexCount}</span>개
+              </p>
+              <p className="text-[#d4a574] font-bold">
+                📅 이달의 도감{" "}
+                <span className="text-[#f4d7aa]">{thisMonthDexCount}</span>개
+              </p>
+              <p className="text-[#d4a574] font-bold">
+                🔄 진행 중 도감{" "}
+                <span className="text-[#f4d7aa]">{ongoingDexCount}</span>개
+              </p>
+              <p className="text-[#d4a574] font-bold">
+                ✅ 달성 완료 도감{" "}
+                <span className="text-[#f4d7aa]">{completedDexCount}</span>개
+              </p>
             </div>
           </section>
 
           
           <section>
             <h2 className="text-xl font-black mb-3 pb-2 text-[#5a3e25] tracking-wide border-b-2 border-[#6b4e2f]">
-              🗺️ 연맹 탐험가
+              🗺️ 연맹 탐험가 {explorers.length > 0 && `(${explorers.length}명)`}
             </h2>
-            <div className="flex gap-4 overflow-x-auto pb-2">
-              {explorers.map((m) => (
-                <div
-                  key={m.id}
-                  className="min-w-[220px] bg-gradient-to-b from-[#5a3e25] to-[#4a3420] rounded-lg p-4 border-2 border-[#6b4e2f] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4),0_4px_12px_rgba(0,0,0,0.3)]"
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#8b6f47] to-[#6b4e2f] text-base flex items-center justify-center text-white font-black shadow-[0_2px_8px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)] border border-[#c9a961]/30">
-                      {m.name[0]}
-                    </div>
-                    <span className="text-base font-black text-[#f4d7aa] tracking-wide">{m.name}</span>
+            {(() => {
+              const itemsPerPage = 4;
+              const totalPages = Math.ceil(explorers.length / itemsPerPage);
+              const startIndex = (explorersPage - 1) * itemsPerPage;
+              const endIndex = startIndex + itemsPerPage;
+              const currentExplorers = explorers.slice(startIndex, endIndex);
+              const showPagination = explorers.length > itemsPerPage;
+
+              return (
+                <>
+                  <div className="flex gap-4 overflow-x-auto pb-2">
+                    {currentExplorers.map((m) => (
+                      <div
+                        key={m.id}
+                        className="min-w-[220px] bg-gradient-to-b from-[#5a3e25] to-[#4a3420] rounded-lg p-4 border-2 border-[#6b4e2f] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4),0_4px_12px_rgba(0,0,0,0.3)]"
+                      >
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#8b6f47] to-[#6b4e2f] text-base flex items-center justify-center text-white font-black shadow-[0_2px_8px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)] border border-[#c9a961]/30">
+                            {m.name[0]}
+                          </div>
+                          <span className="text-base font-black text-[#f4d7aa] tracking-wide">{m.name}</span>
+                        </div>
+                        <p className="text-sm text-[#d4a574] font-medium">{m.intro}</p>
+                      </div>
+                    ))}
                   </div>
-                  <p className="text-sm text-[#d4a574] font-medium">{m.intro}</p>
-                </div>
-              ))}
-            </div>
+
+                  {/* 페이지네이션 컨트롤 (4명 이상일 때만 표시) */}
+                  {showPagination && (
+                    <div className="mt-4 flex items-center justify-center gap-2">
+                      {/* 이전 버튼 */}
+                      <button
+                        type="button"
+                        onClick={() => setExplorersPage((prev) => Math.max(1, prev - 1))}
+                        disabled={explorersPage === 1}
+                        className="px-4 py-2 bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white rounded-lg hover:from-[#9b7f57] hover:to-[#7b5e3f] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm font-medium"
+                      >
+                        이전
+                      </button>
+
+                      {/* 페이지 번호 */}
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                          <button
+                            key={page}
+                            type="button"
+                            onClick={() => setExplorersPage(page)}
+                            className={`w-10 h-10 rounded-lg font-medium transition-all ${
+                              explorersPage === page
+                                ? "bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white shadow-md scale-105"
+                                : "bg-stone-200 text-stone-700 hover:bg-stone-300"
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* 다음 버튼 */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExplorersPage((prev) => Math.min(totalPages, prev + 1))
+                        }
+                        disabled={explorersPage === totalPages}
+                        className="px-4 py-2 bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white rounded-lg hover:from-[#9b7f57] hover:to-[#7b5e3f] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm font-medium"
+                      >
+                        다음
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 페이지 정보 */}
+                  {showPagination && (
+                    <div className="mt-2 text-center text-sm text-stone-600">
+                      {startIndex + 1} - {Math.min(endIndex, explorers.length)} / {explorers.length}명
+                    </div>
+                  )}
+                </>
+              );
+            })()}
           </section>
 
          
           <section className="mt-4 space-y-8">
             <h2 className="text-xl font-black mb-2 pb-2 text-[#5a3e25] tracking-wide border-b-2 border-[#6b4e2f]">
-              📚 연맹도감 기록
+              📚 기록
             </h2>
 
          
+            {/* 진행중인 미션 섹션 */}
+          {guildMissions.length > 0 && (
             <div>
-              <h3 className="text-lg font-black mb-3 text-[#6b4e2f] tracking-wide">🔄 진행중인 도감</h3>
+              <h3 className="text-lg font-black mb-3 text-[#6b4e2f] tracking-wide">🔄 진행중인 미션</h3>
               <div className="relative pb-8">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-8">
+                  {/* 진행 중인 미션 폴더 */}
+                  {guildMissions.map((mission) => {
+                    // 백엔드에서 계산된 participantCount 사용 (실시간 반영)
+                    const recordCount = mission.participantCount || 0;
+                    
+                    return (
+                      <div
+                        key={mission.id}
+                        onClick={() => navigate(`/guild/${guildId}/missions/${mission.id}/records`)}
+                        className="cursor-pointer transform transition-transform hover:scale-105"
+                      >
+                        <div className="relative w-full aspect-square rounded-lg overflow-hidden shadow-lg border-2 border-[#6b4e2f] bg-gradient-to-br from-[#8b5a2b] to-[#5a3315]">
+                          <img
+                            src={folderImage}
+                            alt={mission.title}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+                            <p className="text-white font-bold text-sm truncate">
+                              {mission.title}
+                            </p>
+                            <p className="text-white/80 text-xs truncate">
+                              미션 후기 {recordCount}/{mission.limitCount}개
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  {/* 기존 진행중인 도감 */}
                   {inProgressBooks.map((item) => (
                     <BookCard key={item.id} item={item} />
                   ))}
@@ -366,17 +589,164 @@ const GuildRoom: React.FC = () => {
                 <div className="mt-4 h-2 bg-gradient-to-r from-[#6b4e2f] via-[#8b6f47] to-[#6b4e2f] rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.5)] border border-[#c9a961]/30" />
               </div>
             </div>
+          )}
+
+          {/* 완료된 연맹 미션 섹션 */}
+          <div>
+            <h3 className="text-lg font-black mb-3 text-[#6b4e2f] tracking-wide">📚 연맹 미션</h3>
+            <div className="relative pb-8">
+              {completedMissions.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-8">
+                  {/* 완료된 미션 폴더 */}
+                  {completedMissions.map((mission) => {
+                    // 백엔드에서 계산된 participantCount 사용 (실시간 반영)
+                    const recordCount = mission.participantCount || 0;
+                    
+                    return (
+                      <div
+                        key={mission.id}
+                        onClick={() => navigate(`/guild/${guildId}/missions/${mission.id}/records`)}
+                        className="cursor-pointer transform transition-transform hover:scale-105"
+                      >
+                        <div className="relative w-full aspect-square rounded-lg overflow-hidden shadow-lg border-2 border-[#6b4e2f] bg-gradient-to-br from-[#8b5a2b] to-[#5a3315]">
+                          <img
+                            src={folderImage}
+                            alt={mission.title}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+                            <p className="text-white font-bold text-sm truncate">
+                              {mission.title}
+                            </p>
+                            <p className="text-white/80 text-xs truncate">
+                              미션 후기 {recordCount}/{mission.limitCount}개
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-stone-500">
+                  <p>완료된 연맹 미션이 없습니다.</p>
+                </div>
+              )}
+           
+              <div className="mt-4 h-2 bg-gradient-to-r from-[#6b4e2f] via-[#8b6f47] to-[#6b4e2f] rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.5)] border border-[#c9a961]/30" />
+            </div>
+          </div>
 
            
             <div>
-              <h3 className="text-lg font-black mb-3 text-[#6b4e2f] tracking-wide">✅ 달성 완료 도감</h3>
+              <h3 className="text-lg font-black mb-3 text-[#6b4e2f] tracking-wide">
+                ✅ 개인 도감 기록 {(() => {
+                  // 규칙: missionId가 null이거나 undefined인 기록만 개인 도감 기록으로 표시
+                  // missionId가 있는 기록(연맹 미션 후기)은 절대 개인 도감 기록 섹션에 나타나면 안 됨
+                  const personalRecords = guildRecords.filter((r) => r.missionId === null || r.missionId === undefined);
+                  return personalRecords.length > 0 ? `(${personalRecords.length}개)` : "";
+                })()}
+              </h3>
               <div className="relative pb-8">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-8">
-                  {completedBooks.map((item) => (
-                    <BookCard key={item.id} item={item} />
-                  ))}
-                </div>
-                
+                {/* 페이지네이션: 8개 이상일 때만 적용 */}
+                {(() => {
+                  // 규칙: missionId가 null이거나 undefined인 기록만 개인 도감 기록으로 표시
+                  // missionId가 있는 기록(연맹 미션 후기)은 절대 개인 도감 기록 섹션에 나타나면 안 됨
+                  const personalRecords = guildRecords.filter((r) => r.missionId === null || r.missionId === undefined);
+                  const itemsPerPage = 8;
+                  const totalPages = Math.ceil(personalRecords.length / itemsPerPage);
+                  const startIndex = (currentPage - 1) * itemsPerPage;
+                  const endIndex = startIndex + itemsPerPage;
+                  const currentRecords = personalRecords.slice(startIndex, endIndex);
+                  const showPagination = personalRecords.length > itemsPerPage;
+
+                  return (
+                    <>
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-x-6 gap-y-8">
+                        {currentRecords.map((record) => (
+                          <div
+                            key={record.id}
+                            onClick={() => {
+                              setSelectedRecordId(record.id);
+                              setShowRecordDetailModal(true);
+                            }}
+                            className="cursor-pointer transform transition-transform hover:scale-105"
+                          >
+                            <div className="relative w-full aspect-square rounded-lg overflow-hidden shadow-lg border-2 border-[#6b4e2f] bg-gradient-to-br from-[#8b5a2b] to-[#5a3315]">
+                              <img
+                                src={folderImage}
+                                alt={record.title}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+                                <p className="text-white font-bold text-sm truncate">
+                                  {record.title}
+                                </p>
+                                <p className="text-white/80 text-xs truncate">
+                                  {record.userName || record.userEmail}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* 페이지네이션 컨트롤 (8개 이상일 때만 표시) */}
+                      {showPagination && (
+                        <div className="mt-6 flex items-center justify-center gap-2">
+                          {/* 이전 버튼 */}
+                          <button
+                            type="button"
+                            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                            disabled={currentPage === 1}
+                            className="px-4 py-2 bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white rounded-lg hover:from-[#9b7f57] hover:to-[#7b5e3f] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm font-medium"
+                          >
+                            이전
+                          </button>
+
+                          {/* 페이지 번호 */}
+                          <div className="flex items-center gap-1">
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                              <button
+                                key={page}
+                                type="button"
+                                onClick={() => setCurrentPage(page)}
+                                className={`w-10 h-10 rounded-lg font-medium transition-all ${
+                                  currentPage === page
+                                    ? "bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white shadow-md scale-105"
+                                    : "bg-stone-200 text-stone-700 hover:bg-stone-300"
+                                }`}
+                              >
+                                {page}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* 다음 버튼 */}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                            }
+                            disabled={currentPage === totalPages}
+                            className="px-4 py-2 bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white rounded-lg hover:from-[#9b7f57] hover:to-[#7b5e3f] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm font-medium"
+                          >
+                            다음
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 페이지 정보 */}
+                      {showPagination && (
+                        <div className="mt-3 text-center text-sm text-stone-600">
+                          {startIndex + 1} - {Math.min(endIndex, personalRecords.length)} /{" "}
+                          {personalRecords.length}개
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+
                 <div className="mt-4 h-2 bg-gradient-to-r from-[#6b4e2f] via-[#8b6f47] to-[#6b4e2f] rounded-full shadow-[0_4px_12px_rgba(0,0,0,0.5)] border border-[#c9a961]/30" />
               </div>
             </div>
@@ -417,6 +787,98 @@ const GuildRoom: React.FC = () => {
             {/* 탭 내용 */}
             {rightTab === "dex" ? (
               <div className="flex flex-col gap-3">
+                {/* 미션 목록 */}
+                {guildMissions.map((mission) => {
+                  const isDeleting = deletingMissionIds.has(mission.id);
+                  
+                  const handleDeleteMission = async (e: React.MouseEvent) => {
+                    e.stopPropagation(); // 클릭 이벤트 전파 방지
+                    if (!window.confirm(`"${mission.title}" 미션을 삭제하시겠습니까?`)) return;
+                    
+                    setDeletingMissionIds((prev) => new Set(prev).add(mission.id));
+                    try {
+                      const response = await fetch(`/api/guilds/${guildId}/missions/${mission.id}`, {
+                        method: "DELETE",
+                        credentials: "include",
+                      });
+
+                      if (!response.ok) {
+                        const errorText = await response.text();
+                        let errorMessage = "미션 삭제에 실패했습니다.";
+                        try {
+                          const errorJson = JSON.parse(errorText);
+                          errorMessage = errorJson.message || errorMessage;
+                        } catch {
+                          errorMessage = errorText || errorMessage;
+                        }
+                        throw new Error(errorMessage);
+                      }
+
+                      const json = await response.json();
+                      if (!json.ok) {
+                        throw new Error(json.message || "미션 삭제에 실패했습니다.");
+                      }
+
+                      toast.success("미션이 삭제되었습니다.");
+                      // 미션 목록 다시 로드
+                      const missionsResponse = await fetch(`/api/guilds/${guildId}/missions`, {
+                        credentials: "include",
+                      });
+                      if (missionsResponse.ok) {
+                        const missionsJson = await missionsResponse.json();
+                        if (missionsJson.ok && missionsJson.data) {
+                          setGuildMissions(missionsJson.data);
+                        }
+                      }
+                    } catch (err: any) {
+                      console.error("미션 삭제 실패", err);
+                      toast.error(err?.message || "미션 삭제에 실패했습니다.");
+                    } finally {
+                      setDeletingMissionIds((prev) => {
+                        const newSet = new Set(prev);
+                        newSet.delete(mission.id);
+                        return newSet;
+                      });
+                    }
+                  };
+
+                  return (
+                    <div
+                      key={mission.id}
+                      className="bg-gradient-to-b from-[#5a3e25] to-[#4a3420] rounded-lg p-3 border border-[#6b4e2f] shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]"
+                    >
+                      <div 
+                        onClick={() => {
+                          setSelectedMissionId(mission.id);
+                          setShowRecordModal(true);
+                        }}
+                        className="cursor-pointer hover:from-[#6b4e3f] hover:to-[#5a4e30] transition-all"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-base font-bold text-[#f4d7aa] tracking-wide">
+                            {mission.title}
+                          </span>
+                          {/* 삭제 버튼 (연맹장만 표시) */}
+                          {isOwner && (
+                            <button
+                              type="button"
+                              onClick={handleDeleteMission}
+                              disabled={isDeleting}
+                              className="text-red-400 hover:text-red-300 text-xs px-2 py-1 rounded transition-colors disabled:opacity-50"
+                              title="미션 삭제"
+                            >
+                              {isDeleting ? "삭제 중..." : "✕"}
+                            </button>
+                          )}
+                        </div>
+                        <div className="mt-1 text-xs text-[#d4a574]">
+                          현재 참여 인원: {mission.participantCount}/{mission.limitCount}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {/* 연맹 도감 목록 */}
                 {guildDex.map((item) => (
                   <div
                     key={item.id}
@@ -488,6 +950,150 @@ const GuildRoom: React.FC = () => {
           </div>
         </aside>
       </main>
+
+      {/* 미션 추가 모달 */}
+      <GuildMissionModal
+        open={showMissionModal}
+        onClose={() => setShowMissionModal(false)}
+        guildId={guildId}
+        onSaveSuccess={async () => {
+          // 미션 목록 다시 로드 (미션 생성 후 진행 중인 미션 목록 갱신)
+          try {
+            // 진행 중인 미션 목록
+            const missionsResponse = await fetch(`/api/guilds/${guildId}/missions`, {
+              credentials: "include",
+            });
+            if (missionsResponse.ok) {
+              const missionsJson = await missionsResponse.json();
+              if (missionsJson.ok && missionsJson.data) {
+                setGuildMissions(missionsJson.data);
+              }
+            }
+            
+            // 완료된 미션 목록도 함께 갱신
+            const completedMissionsResponse = await fetch(`/api/guilds/${guildId}/missions/completed`, {
+              credentials: "include",
+            });
+            if (completedMissionsResponse.ok) {
+              const completedMissionsJson = await completedMissionsResponse.json();
+              if (completedMissionsJson.ok && completedMissionsJson.data) {
+                setCompletedMissions(completedMissionsJson.data);
+              }
+            }
+          } catch (err) {
+            console.error("미션 목록 로드 실패:", err);
+          }
+        }}
+      />
+
+      {/* 도감 추가 모달 (일반 도감 또는 미션 도감) */}
+      <GuildRecordModal
+        open={showRecordModal}
+        onClose={() => {
+          setShowRecordModal(false);
+          setSelectedMissionId(null);
+        }}
+        guildId={guildId}
+        missionId={selectedMissionId || undefined}
+        onSaveSuccess={async () => {
+          // 도감 기록 다시 로드
+          try {
+            const recordsResponse = await fetch(`/api/guilds/${guildId}/records`, {
+              credentials: "include",
+            });
+            if (recordsResponse.ok) {
+              const recordsJson = await recordsResponse.json();
+              if (recordsJson.ok && recordsJson.data) {
+                setGuildRecords(recordsJson.data);
+                setCurrentPage(1);
+              }
+            }
+          } catch (err) {
+            console.error("도감 기록 로드 실패:", err);
+          }
+          // 미션 목록 다시 로드 (참여 인원 수 업데이트)
+          // 규칙: 미션 인원이 가득 차면 다음 렌더링부터 guildMissions에서 사라지고 completedMissions에만 나타남
+          // 백엔드가 participantCount >= limitCount인 미션을 자동으로 필터링함
+          try {
+            // 진행 중인 미션 목록 (participantCount < limitCount)
+            const missionsResponse = await fetch(`/api/guilds/${guildId}/missions`, {
+              credentials: "include",
+            });
+            if (missionsResponse.ok) {
+              const missionsJson = await missionsResponse.json();
+              if (missionsJson.ok && missionsJson.data) {
+                setGuildMissions(missionsJson.data);
+              }
+            }
+            
+            // 완료된 미션 목록 (participantCount >= limitCount)
+            const completedMissionsResponse = await fetch(`/api/guilds/${guildId}/missions/completed`, {
+              credentials: "include",
+            });
+            if (completedMissionsResponse.ok) {
+              const completedMissionsJson = await completedMissionsResponse.json();
+              if (completedMissionsJson.ok && completedMissionsJson.data) {
+                setCompletedMissions(completedMissionsJson.data);
+              }
+            }
+          } catch (err) {
+            console.error("미션 목록 로드 실패:", err);
+          }
+          // 랭킹도 다시 로드
+          await reloadData();
+          if (selectedMissionId) {
+            toast.success("미션 후기가 작성되었습니다! 20점을 획득했습니다.");
+          } else {
+            toast.success("도감이 추가되었습니다! 10점을 획득했습니다.");
+          }
+          setSelectedMissionId(null);
+        }}
+      />
+
+      {/* 도감 상세 보기 모달 */}
+      {selectedRecordId && (
+        <GuildRecordDetailModal
+          open={showRecordDetailModal}
+          onClose={() => {
+            setShowRecordDetailModal(false);
+            setSelectedRecordId(null);
+            // URL에서도 recordId 제거
+            const newSearchParams = new URLSearchParams(searchParams);
+            newSearchParams.delete("recordId");
+            setSearchParams(newSearchParams, { replace: true });
+          }}
+          recordId={selectedRecordId}
+          guildId={guildId}
+          onDeleteSuccess={async () => {
+            // 도감 기록 삭제 후 데이터 갱신
+            await reloadData();
+            // 미션 목록도 갱신 (미션 후기 삭제 시 participantCount 업데이트)
+            try {
+              const missionsResponse = await fetch(`/api/guilds/${guildId}/missions`, {
+                credentials: "include",
+              });
+              if (missionsResponse.ok) {
+                const missionsJson = await missionsResponse.json();
+                if (missionsJson.ok && missionsJson.data) {
+                  setGuildMissions(missionsJson.data);
+                }
+              }
+              
+              const completedMissionsResponse = await fetch(`/api/guilds/${guildId}/missions/completed`, {
+                credentials: "include",
+              });
+              if (completedMissionsResponse.ok) {
+                const completedMissionsJson = await completedMissionsResponse.json();
+                if (completedMissionsJson.ok && completedMissionsJson.data) {
+                  setCompletedMissions(completedMissionsJson.data);
+                }
+              }
+            } catch (err) {
+              console.error("미션 목록 로드 실패:", err);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };
