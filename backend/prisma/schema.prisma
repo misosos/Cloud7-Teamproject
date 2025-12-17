@@ -1,5 +1,5 @@
 datasource db {
-  provider = "mysql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -157,6 +157,9 @@ model Stay {
   categoryGroupCode String?
   mappedCategory    String?
 
+  // 추천 장소 달성 시 점수 지급 여부 (중복 방지)
+  recommendationPointsAwardedAt DateTime?
+
   createdAt DateTime @default(now())
 
   @@index([userId, startTime])
@@ -279,6 +282,9 @@ model GuildRecord {
   mainImage  String?   // 메인 이미지 URL
   extraImagesJson String? // 추가 이미지 배열을 JSON 문자열로 저장
   hashtagsJson   String? // 해시태그 배열을 JSON 문자열로 저장
+
+  // 추천 장소 달성 기록인 경우 kakaoPlaceId가 있음
+  kakaoPlaceId String? // 추천 장소 달성 기록인 경우 카카오 장소 ID
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

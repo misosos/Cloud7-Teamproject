@@ -7,7 +7,9 @@ interface GuildRecordModalProps {
   onClose: () => void;
   guildId: string;
   missionId?: string; // 미션 참여 기록인 경우 missionId 전달
-  onSaveSuccess?: () => void;
+  kakaoPlaceId?: string; // 추천 장소 달성 기록인 경우 카카오 장소 ID
+  placeName?: string; // 추천 장소 달성 기록인 경우 장소 이름 (제목 미리 채우기용)
+  onSaveSuccess?: (recordId?: string) => void; // 기록 ID 전달
   onError?: (error: string) => void; // 에러 발생 시 콜백
 }
 
@@ -30,6 +32,8 @@ export default function GuildRecordModal({
   onClose,
   guildId,
   missionId,
+  kakaoPlaceId,
+  placeName,
   onSaveSuccess,
   onError,
 }: GuildRecordModalProps) {
@@ -99,6 +103,13 @@ export default function GuildRecordModal({
       setExtraImagePreviews([]);
     }
   }, [open]);
+
+  // 추천 장소 달성 기록인 경우 제목 미리 채우기
+  useEffect(() => {
+    if (open && kakaoPlaceId && placeName && !title.trim()) {
+      setTitle(placeName);
+    }
+  }, [open, kakaoPlaceId, placeName]);
 
   if (!open) return null;
 
@@ -226,6 +237,12 @@ export default function GuildRecordModal({
       return;
     }
 
+    // 추천 장소 기록인 경우 이미지 필수
+    if (kakaoPlaceId && !mainImageFile) {
+      setErrorMessage("추천 장소 기록은 사진이 필수입니다. 사진을 추가해주세요.");
+      return;
+    }
+
     // Custom category validation
     if (category === "기타" && !customCategory.trim()) {
       setErrorMessage("카테고리를 직접 입력해주세요.");
@@ -329,6 +346,7 @@ export default function GuildRecordModal({
           mainImage: mainImageUrl,
           extraImages: extraImageUrls,
           hashtags,
+          kakaoPlaceId: kakaoPlaceId || null, // 추천 장소 달성 기록인 경우
         }),
       });
 
@@ -365,6 +383,10 @@ export default function GuildRecordModal({
           errorMessage = "이미 참여한 미션입니다.";
         } else if (json.error === "BAD_REQUEST") {
           errorMessage = json.message || errorMessage;
+          // 5분 미달 에러 메시지 처리
+          if (errorMessage.includes("5분 이상 머물러야") || errorMessage.includes("10분 이상 머물러야")) {
+            errorMessage = "해당 장소에서 최소 5분 이상 머물러야 기록을 작성할 수 있습니다.";
+          }
         }
         
         throw new Error(errorMessage);
@@ -391,8 +413,11 @@ export default function GuildRecordModal({
       setExtraImageFiles([]);
       setExtraImagePreviews([]);
 
+      // 생성된 기록 ID 전달
+      const createdRecordId = json.data?.id;
+      
       if (onSaveSuccess) {
-        onSaveSuccess();
+        onSaveSuccess(createdRecordId);
       }
 
       onClose();
@@ -460,27 +485,37 @@ export default function GuildRecordModal({
                     alt="메인 이미지 미리보기"
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                   />
-                  {/* 삭제 버튼 */}
-                  <button
-                    type="button"
-                    onClick={handleRemoveMainImage}
-                    className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 text-sm font-bold shadow-lg"
-                    title="삭제"
-                  >
-                    ×
-                  </button>
+                  {/* 삭제 버튼 - 추천 장소 기록인 경우 삭제 불가 */}
+                  {!kakaoPlaceId && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveMainImage}
+                      className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 text-sm font-bold shadow-lg"
+                      title="삭제"
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
               ) : (
-                <label className="w-full h-full flex items-center justify-center border-2 border-dashed border-[#6b4e2f] rounded-lg cursor-pointer hover:border-[#c9a961] bg-gradient-to-b from-[#4a3420] to-[#3a2818] transition-colors shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]">
+                <label className={`w-full h-full flex items-center justify-center border-2 border-dashed rounded-lg cursor-pointer hover:border-[#c9a961] bg-gradient-to-b from-[#4a3420] to-[#3a2818] transition-colors shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)] ${
+                  kakaoPlaceId ? "border-red-500 border-2" : "border-[#6b4e2f]"
+                }`}>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleMainImageChange}
                     className="hidden"
+                    required={!!kakaoPlaceId} // 추천 장소 기록인 경우 필수
                   />
                   <div className="text-center text-[#d4a574]">
                     <div className="text-3xl mb-1">📷</div>
-                    <div className="text-sm font-bold">표지 이미지 추가</div>
+                    <div className="text-sm font-bold">
+                      {kakaoPlaceId ? "표지 이미지 추가 (필수)" : "표지 이미지 추가"}
+                    </div>
+                    {kakaoPlaceId && (
+                      <div className="text-xs text-red-400 mt-1">추천 장소 기록은 사진이 필수입니다</div>
+                    )}
                   </div>
                 </label>
               )}
@@ -497,7 +532,10 @@ export default function GuildRecordModal({
                   placeholder="도감 제목"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full border-2 border-[#6b4e2f] rounded-lg px-3 py-2.5 text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] placeholder:text-[#8b6f47] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]"
+                  readOnly={!!kakaoPlaceId} // 추천 장소 기록인 경우 수정 불가
+                  className={`w-full border-2 border-[#6b4e2f] rounded-lg px-3 py-2.5 text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] placeholder:text-[#8b6f47] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)] ${
+                    kakaoPlaceId ? "opacity-75 cursor-not-allowed" : ""
+                  }`}
                 />
               </div>
               <div>

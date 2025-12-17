@@ -28,6 +28,7 @@ type GuildRecordDetail = {
   extraImages: string[];
   hashtags: string[];
   missionId: string | null; // 규칙: missionId가 null이면 개인 도감 기록, null이 아니면 연맹 미션 기록
+  kakaoPlaceId: string | null; // 추천 장소 달성 기록인 경우 카카오 장소 ID
   createdAt: string;
   updatedAt: string;
 };

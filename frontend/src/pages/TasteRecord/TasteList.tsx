@@ -41,14 +41,14 @@ function SectionTitle({
   return (
     <div className="max-w-screen-xl mx-auto px-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-3xl sm:text-4xl font-semibold text-stone-800 tracking-tight">
+        <h2 className="text-3xl sm:text-4xl font-black text-[#5a3e25] tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.2)]">
           {children}
         </h2>
         {/* action이 있으면 우측에 렌더(예: "기록 추가" 버튼) */}
         {action ? <div className="ml-4">{action}</div> : null}
       </div>
       {/* 얇은 가로 구분선 */}
-      <div className="mt-3 h-px w-full bg-stone-300/70" />
+      <div className="mt-3 h-px w-full bg-gradient-to-r from-transparent via-[#6b4e2f] to-transparent" />
     </div>
   );
 }
@@ -77,7 +77,7 @@ function RecordSlider({ items }: { items: TasteRecordItem[] }) {
         type="button"
         onClick={() => scroll(-1)}
         aria-label="이전"
-        className="absolute left-2 top-1/2 -translate-y-1/2 z-10 hidden sm:inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/80 shadow ring-1 ring-stone-300 hover:bg-white"
+        className="absolute left-2 top-1/2 -translate-y-1/2 z-10 hidden sm:inline-flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)] border border-[#c9a961]/30 hover:from-[#9b7f57] hover:to-[#7b5e3f] active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] transition"
       >
         ‹
       </button>
@@ -102,7 +102,7 @@ function RecordSlider({ items }: { items: TasteRecordItem[] }) {
         type="button"
         onClick={() => scroll(1)}
         aria-label="다음"
-        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 hidden sm:inline-flex items-center justify-center w-9 h-9 rounded-full bg-white/80 shadow ring-1 ring-stone-300 hover:bg-white"
+        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 hidden sm:inline-flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)] border border-[#c9a961]/30 hover:from-[#9b7f57] hover:to-[#7b5e3f] active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] transition"
       >
         ›
       </button>
@@ -124,7 +124,7 @@ function AddButton({
   return (
     <button
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/70 bg-amber-100/70 hover:bg-amber-200/70 text-amber-900 text-sm px-3 py-1.5 shadow-sm transition"
+      className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white text-sm px-4 py-2 font-black tracking-wide shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)] border border-[#c9a961]/30 hover:from-[#9b7f57] hover:to-[#7b5e3f] active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] transition"
     >
       {/* 시각적 아이콘(장식) — 스크린리더는 텍스트 라벨(children)만 읽으면 충분 */}
       <svg
@@ -209,18 +209,21 @@ export default function TasteList() {
   };
 
   return (
-    <>
+    <div className="min-h-screen bg-[#fdf8f1]">
       {/* 상단 네비게이션(로그인 상태/메뉴/CTA) */}
       <HeaderNav />
 
-      <main className="pb-28">
+      <main className="mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-6 py-10">
         {/* 1) 히어로(타이틀) */}
-        <section className="pt-16 sm:pt-20 pb-10">
-          <div className="max-w-screen-xl mx-auto px-6">
-            <h1 className="text-center text-4xl sm:text-5xl font-bold text-stone-900 tracking-tight">
-              취향기록
+        <section className="mb-8">
+          <header className="mb-8">
+            <h1 className="text-4xl font-black text-[#5a3e25] mb-2 tracking-wider drop-shadow-[0_2px_4px_rgba(0,0,0,0.2)]">
+            🗺️ 취향기록
             </h1>
-          </div>
+            <p className="text-base text-[#6b4e2f] font-medium">
+              나만의 취향을 기록하고 모아보세요.
+            </p>
+          </header>
         </section>
 
         {/* 2) 작성 영역(인라인 모달 섹션) */}
@@ -246,24 +249,36 @@ export default function TasteList() {
           </SectionTitle>
           <div className="mt-8">
             {isLoading ? (
-              <p className="text-sm text-stone-500 text-center">
-                기록을 불러오는 중입니다...
-              </p>
+              <div className="bg-gradient-to-b from-[#5a3e25] to-[#4a3420] rounded-lg border-2 border-[#6b4e2f] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4),0_8px_24px_rgba(0,0,0,0.4)] px-6 py-10 text-center relative overflow-hidden">
+                {/* 고대 문서 장식 */}
+                <div className="absolute top-3 left-3 right-3 h-px bg-gradient-to-r from-transparent via-[#c9a961]/40 to-transparent" />
+                <p className="text-base text-[#d4a574] font-medium">
+                  기록을 불러오는 중입니다...
+                </p>
+              </div>
             ) : errorMessage ? (
-              <p className="text-sm text-red-600 text-center">
-                {errorMessage}
-              </p>
+              <div className="bg-gradient-to-b from-[#5a3e25] to-[#4a3420] rounded-lg border-2 border-red-500 shadow-[inset_0_2px_8px_rgba(0,0,0,0.4),0_8px_24px_rgba(0,0,0,0.4)] px-6 py-10 text-center relative overflow-hidden">
+                {/* 고대 문서 장식 */}
+                <div className="absolute top-3 left-3 right-3 h-px bg-gradient-to-r from-transparent via-[#c9a961]/40 to-transparent" />
+                <p className="text-base text-red-400 font-bold">
+                  {errorMessage}
+                </p>
+              </div>
             ) : recordsAll.length === 0 ? (
-              <p className="text-sm text-stone-500 text-center">
-                아직 저장된 기록이 없습니다. &quot;기록 추가&quot; 버튼을
-                눌러 첫 기록을 남겨보세요.
-              </p>
+              <div className="bg-gradient-to-b from-[#5a3e25] to-[#4a3420] rounded-lg border-2 border-dashed border-[#6b4e2f] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4),0_8px_24px_rgba(0,0,0,0.4)] px-6 py-10 text-center relative overflow-hidden">
+                {/* 고대 문서 장식 */}
+                <div className="absolute top-3 left-3 right-3 h-px bg-gradient-to-r from-transparent via-[#c9a961]/40 to-transparent" />
+                <p className="text-base text-[#8b6f47] font-medium">
+                  아직 저장된 기록이 없습니다. &quot;기록 추가&quot; 버튼을
+                  눌러 첫 기록을 남겨보세요.
+                </p>
+              </div>
             ) : (
               <RecordSlider items={recordsAll} />
             )}
           </div>
         </section>
       </main>
-    </>
+    </div>
   );
 }

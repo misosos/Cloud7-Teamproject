@@ -48,10 +48,10 @@ export default function Dashboard() {
       className={
         // 전체 페이지 설정
         // - min-h-screen : 화면 높이만큼 최소 높이 확보(푸터가 화면 중간에 붙지 않도록)
-        // - text-stone-800 : 본문 기본 글자색(짙은 회색)
+        // - bg-[#fdf8f1] : 배경색 (GuildHome.tsx와 동일)
         // - pb-[72px] : 모바일에서 하단 고정 탭바가 있을 경우, 콘텐츠가 가려지지 않게 여백 확보
         //   · md:pb-0 : 태블릿/데스크톱에서는 일반 여백으로 복귀
-        "min-h-screen text-stone-800 pb-[72px] md:pb-0"
+        "min-h-screen bg-[#fdf8f1] pb-[72px] md:pb-0"
       }
     >
       {/**
@@ -72,14 +72,14 @@ export default function Dashboard() {
         <div className="mt-4 flex flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
           <Link
             to="/nearby"
-            className="inline-flex items-center justify-center rounded-full bg-amber-700 px-4 py-2 text-sm font-medium text-stone-50 shadow-sm hover:bg-amber-800 transition"
+            className="inline-flex items-center justify-center rounded-lg bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] px-4 py-2.5 text-sm font-black text-white tracking-wide shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)] border border-[#c9a961]/30 hover:from-[#9b7f57] hover:to-[#7b5e3f] active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] transition"
           >
-            내 주변 놀거리 추천
+            🗺️ 내 주변 놀거리 추천
           </Link>
 
           <Link
             to="/map"
-            className="text-xs sm:text-sm text-stone-500 hover:text-stone-700 hover:underline"
+            className="text-xs sm:text-sm text-[#8b6f47] hover:text-[#6b4e2f] font-medium hover:underline"
           >
             (개발용) 카카오맵 테스트 화면 열기
           </Link>
@@ -138,7 +138,7 @@ export default function Dashboard() {
        *  - 현재 연도를 자동으로 표시합니다. (new Date().getFullYear())
        *  - 작은 글씨로 중앙 정렬
        */}
-      <footer className="mt-20 py-10 text-center text-xs text-stone-500">
+      <footer className="mt-20 py-10 text-center text-xs text-[#8b6f47] font-medium">
         © {new Date().getFullYear()} 취향도감. All rights reserved.
       </footer>
     </div>

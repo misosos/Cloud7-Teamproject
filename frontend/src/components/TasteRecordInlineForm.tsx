@@ -218,135 +218,195 @@ export default function TasteRecordModal({
   return (
     <section className="max-w-screen-xl mx-auto px-6 mt-8">
       {/* 작성 카드 박스 */}
-      <div className="bg-white w-full rounded-xl border border-stone-200 shadow-md p-6">
+      <div className="bg-gradient-to-b from-[#5a3e25] to-[#4a3420] w-full rounded-lg border-2 border-[#6b4e2f] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4),0_8px_24px_rgba(0,0,0,0.4)] p-6 relative overflow-hidden">
+        {/* 금속 장식 테두리 */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#c9a961] to-transparent opacity-70" />
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#c9a961] to-transparent opacity-70" />
+        
         {/* 헤더: 제목 + 닫기 버튼 */}
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold text-stone-800">새 기록 추가</h2>
+        <div className="flex items-center justify-between gap-3 mb-6 pb-4 border-b-2 border-[#6b4e2f]">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">📝</span>
+            <h2 className="text-xl sm:text-2xl font-black text-[#f4d7aa] tracking-wide">새 기록 추가</h2>
+          </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-xs px-2 py-1 rounded-md border border-stone-300 text-stone-500 hover:bg-stone-100"
+            className="relative z-50 text-[#d4a574] hover:text-[#f4d7aa] hover:bg-[#6b4e2f]/60 rounded-full w-9 h-9 flex items-center justify-center transition text-lg font-black cursor-pointer active:scale-95 border border-[#6b4e2f]"
           >
-            닫기
+            ×
           </button>
         </div>
 
         {/* 입력 폼 */}
-        <div className="mt-4 space-y-4">
+        <div className="space-y-5">
           {/* 제목 입력칸 (필수) */}
-          <input
-            type="text"
-            placeholder="제목"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="w-full border border-stone-300 rounded-md px-3 py-2"
-          />
+          <div>
+            <label className="block text-base font-black text-[#f4d7aa] mb-1 tracking-wide">
+              제목<span className="text-red-400 ml-1">*</span>
+            </label>
+            <input
+              type="text"
+              placeholder="제목을 입력하세요"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full border-2 border-[#6b4e2f] rounded-lg px-3 py-2.5 text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] placeholder:text-[#8b6f47] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]"
+            />
+          </div>
 
           {/* 짧은 캡션 */}
-          <input
-            type="text"
-            placeholder="짧은 캡션"
-            value={caption}
-            onChange={(e) => setCaption(e.target.value)}
-            className="w-full border border-stone-300 rounded-md px-3 py-2"
-          />
+          <div>
+            <label className="block text-base font-black text-[#f4d7aa] mb-1 tracking-wide">
+              짧은 캡션
+            </label>
+            <input
+              type="text"
+              placeholder="짧은 캡션을 입력하세요"
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              className="w-full border-2 border-[#6b4e2f] rounded-lg px-3 py-2.5 text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] placeholder:text-[#8b6f47] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]"
+            />
+          </div>
 
           {/* 카테고리 선택 드롭다운 */}
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="w-full border border-stone-300 rounded-md px-3 py-2"
-          >
-            <option value="">카테고리 선택</option>
-            {categoryOptions.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+          <div>
+            <label className="block text-base font-black text-[#f4d7aa] mb-1 tracking-wide">
+              카테고리<span className="text-red-400 ml-1">*</span>
+            </label>
+            <select
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+              className="w-full border-2 border-[#6b4e2f] rounded-lg px-3 py-2.5 text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]"
+            >
+              <option value="" className="bg-[#4a3420] text-[#d4a574]">카테고리 선택</option>
+              {categoryOptions.map((c) => (
+                <option key={c} value={c} className="bg-[#4a3420] text-[#d4a574]">
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
 
           {/* 기록 날짜 선택 (실제 경험 날짜) */}
           <div>
-            <p className="text-sm text-stone-700 mb-1">기록 날짜 선택 (선택)</p>
-            <input
-              type="date"
-              value={recordDate}
-              onChange={(e) => setRecordDate(e.target.value)}
-              className="w-full border border-stone-300 rounded-md px-3 py-2"
-            />
-            <p className="mt-1 text-xs text-stone-500">
+            <label className="block text-base font-black text-[#f4d7aa] mb-1 tracking-wide">
+              기록 날짜
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={recordDate}
+                onChange={(e) => setRecordDate(e.target.value)}
+                className="flex-1 border-2 border-[#6b4e2f] rounded-lg px-3 py-2.5 text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]"
+              />
+              <span className="text-2xl flex items-center justify-center text-[#d4a574]">
+                📅
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-[#8b6f47] font-medium">
               실제로 이 경험을 했던 날짜가 있다면 선택해주세요. 비워두면 기본값으로 저장될 수 있습니다.
             </p>
           </div>
 
           {/* 태그 선택 (다중 선택 가능) */}
           <div>
-            <p className="text-sm text-stone-700 mb-1">태그 선택</p>
+            <label className="block text-base font-black text-[#f4d7aa] mb-2 tracking-wide">
+              태그 선택
+            </label>
             <div className="flex flex-wrap gap-2">
-              {tagOptions.map((t) => (
-                <label key={t} className="flex items-center gap-1 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={selectedTags.includes(t)}
-                    onChange={() =>
+              {tagOptions.map((t) => {
+                const isSelected = selectedTags.includes(t);
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() =>
                       setSelectedTags((prev) =>
                         prev.includes(t)
                           ? prev.filter((v) => v !== t) // 이미 있으면 제거
                           : [...prev, t], // 없으면 추가
                       )
                     }
-                  />
-                  {t}
-                </label>
-              ))}
+                    className={`px-3.5 py-1.5 rounded-full text-sm font-bold transition-colors ${
+                      isSelected
+                        ? "bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white shadow-[0_2px_8px_rgba(0,0,0,0.5)] border border-[#c9a961]/30"
+                        : "bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] border border-[#6b4e2f] hover:from-[#5a4430] hover:to-[#4a3828] shadow-[inset_0_1px_2px_rgba(0,0,0,0.3)]"
+                    }`}
+                  >
+                    #{t}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
           {/* 이미지 첨부 (선택) */}
           <div>
-            <p className="text-sm text-stone-700 mb-1">사진 첨부 (선택)</p>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              className="block w-full text-sm text-stone-700 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100"
-            />
-            {imagePreview && (
-              <div className="mt-3 flex items-center gap-3">
-                <div className="w-20 h-20 rounded-md overflow-hidden border border-stone-200 bg-stone-50">
-                  <img
-                    src={imagePreview}
-                    alt="첨부 이미지 미리보기"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <p className="text-xs text-stone-500">
-                  미리보기 (썸네일 크기로 표시됩니다)
-                </p>
+            <label className="block text-base font-black text-[#f4d7aa] mb-2 tracking-wide">
+              사진 첨부
+            </label>
+            {imagePreview ? (
+              <div className="relative w-full max-w-xs rounded-lg overflow-hidden border-2 border-[#6b4e2f] shadow-[0_8px_24px_rgba(0,0,0,0.5)] group bg-[#3a2818]">
+                <img
+                  src={imagePreview}
+                  alt="첨부 이미지 미리보기"
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImageFile(null);
+                    setImagePreview(null);
+                  }}
+                  className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 text-sm font-bold shadow-lg"
+                  title="삭제"
+                >
+                  ×
+                </button>
               </div>
+            ) : (
+              <label className="inline-flex items-center justify-center w-32 h-32 border-2 border-dashed border-[#6b4e2f] rounded-lg cursor-pointer hover:border-[#c9a961] bg-gradient-to-b from-[#4a3420] to-[#3a2818] transition-colors shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+                <div className="text-center">
+                  <div className="text-3xl mb-1 text-[#d4a574]">📷</div>
+                  <div className="text-sm font-bold text-[#d4a574]">사진 추가</div>
+                </div>
+              </label>
             )}
           </div>
 
           {/* 상세 내용 입력 */}
-          <textarea
-            placeholder="내용 작성"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            className="w-full border border-stone-300 rounded-md px-3 py-2 h-32"
-          />
+          <div>
+            <label className="block text-base font-black text-[#f4d7aa] mb-2 tracking-wide">
+              상세 내용
+            </label>
+            <textarea
+              placeholder="내용을 작성해주세요"
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="w-full border-2 border-[#6b4e2f] rounded-lg px-3 py-2.5 h-32 text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] placeholder:text-[#8b6f47] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)] resize-none"
+            />
+          </div>
         </div>
 
         {/* 저장 실패 시 에러 메시지 */}
         {errorMessage && (
-          <p className="mt-4 text-sm text-red-600">{errorMessage}</p>
+          <div className="mt-5 rounded-lg bg-gradient-to-b from-[#4a1f1f] to-[#3a1818] border-2 border-red-600/50 px-4 py-3 shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]">
+            <p className="text-sm text-red-400 font-bold">{errorMessage}</p>
+          </div>
         )}
 
         {/* 하단 액션 버튼: 취소 / 저장 */}
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 pt-4 flex justify-end gap-3 border-t-2 border-[#6b4e2f]">
           {/* 취소 버튼 */}
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm rounded-md bg-stone-200 hover:bg-stone-300"
+            className="px-7 py-2.5 rounded-lg bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] text-base font-black tracking-wide shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)] border-2 border-[#6b4e2f] hover:from-[#5a4430] hover:to-[#4a3828] active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] transition"
           >
             취소
           </button>
@@ -354,7 +414,7 @@ export default function TasteRecordModal({
           {/* 저장 버튼: API 호출 + 성공 시 콜백 호출 */}
           <button
             onClick={handleSave}
-            className="px-4 py-2 text-sm rounded-md bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="px-7 py-2.5 rounded-lg bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white text-base font-black tracking-wide shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)] border border-[#c9a961]/30 hover:from-[#9b7f57] hover:to-[#7b5e3f] active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] transition disabled:opacity-60 disabled:cursor-not-allowed"
             disabled={isSaving}
           >
             {isSaving ? "저장 중..." : "저장하기"}

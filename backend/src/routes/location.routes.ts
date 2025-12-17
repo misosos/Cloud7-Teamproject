@@ -114,14 +114,14 @@ function toPlaceDTO(doc: KakaoPlaceDocument): PlaceDTO {
 const FUN_CATEGORY_GROUPS = ["CT1", "AT4", "CE7", "FD6"] as const;
 
 // stay 판정용 파라미터
-const MAX_DISTANCE_M = 50;               // 같은 장소로 볼 거리
+const MAX_DISTANCE_M = 1000;             // 같은 장소로 볼 거리 (1km)
 const MAX_GAP_MS = 5 * 60 * 1000;        // 5분 이내면 같은 stay
-const MIN_STAY_MS = 10 * 60 * 1000;      // 🔥 10분 이상 머물러야 최종 "머문장소" 인정
+const MIN_STAY_MS = 5 * 60 * 1000;       // 🔥 5분 이상 머물러야 최종 "머문장소" 인정
 
-const SEARCH_RADIUS = 200;               // Kakao 검색 반경
-const MATCH_RADIUS = 50;                 // 검색 결과와 실제 위치 매칭 반경
+const SEARCH_RADIUS = 1000;              // Kakao 검색 반경 (1km)
+const MATCH_RADIUS = 1000;               // 검색 결과와 실제 위치 매칭 반경 (1km)
 
-// 현재 위치 주변 Kakao 장소 1개 매칭
+// 현재 위치 주변 Kakao 장소 1개 매칭 (가장 가까운 것)
 async function findStayedPlace(
   lat: number,
   lng: number,
@@ -165,10 +165,57 @@ async function findStayedPlace(
   return candidates[0].place;
 }
 
+// 현재 위치 주변 Kakao 장소 여러 개 반환 (1km 반경 내 모든 장소)
+async function findNearbyPlaces(
+  lat: number,
+  lng: number,
+): Promise<PlaceDTO[]> {
+  if (!KAKAO_API_KEY) return [];
+
+  const x = String(lng);
+  const y = String(lat);
+  const all: PlaceDTO[] = [];
+
+  for (const group of FUN_CATEGORY_GROUPS) {
+    const res = await axios.get<KakaoPlaceResponse>(KAKAO_LOCAL_BASE, {
+      headers: {
+        Authorization: `KakaoAK ${KAKAO_API_KEY}`,
+      },
+      params: {
+        category_group_code: group,
+        x,
+        y,
+        radius: SEARCH_RADIUS,
+        sort: "distance",
+        size: 15,
+      },
+    });
+
+    res.data.documents.map(toPlaceDTO).forEach((p) => all.push(p));
+  }
+
+  if (all.length === 0) return [];
+
+  // kakaoPlaceId 기준 중복 제거
+  const dedup = new Map<string, PlaceDTO>();
+  all.forEach((p) => dedup.set(p.id, p));
+
+  // 1km 반경 내 장소만 필터링
+  const nearby = Array.from(dedup.values())
+    .map((p) => ({
+      place: p,
+      dist: distanceMeters(lat, lng, p.y, p.x),
+    }))
+    .filter((item) => item.dist <= MATCH_RADIUS)
+    .map((item) => item.place);
+
+  return nearby;
+}
+
 // ───────────────────────────────────────────────
 // POST /api/location/update
 //  - 현재 위치 저장(LiveLocation upsert)
-//  - 10분 머문장소 → Stay 생성/갱신 + 카테고리 태깅
+//  - 5분 머문장소 → Stay 생성/갱신 + 카테고리 태깅
 //  - 추천(Recommendation)과 연결: 방문한 장소면 stayId 세팅
 // ───────────────────────────────────────────────
 router.post(
@@ -256,10 +303,10 @@ router.post(
         `[/api/location/update] user=${userId}, stayId=${stay.id}, mode=${mode}, durationMs=${durationMs}`,
       );
 
-      // 3) 10분 이상 & 아직 카테고리 없는 stay → Kakao 태깅
+      // 3) 5분 이상 & 아직 카테고리 없는 stay → Kakao 태깅
       if (durationMs >= MIN_STAY_MS && !stay.mappedCategory) {
         console.log(
-          `⏰ [StayTag] user=${userId}, stayId=${stay.id} 가 10분 이상 머무름 → 카카오 태깅 시도`,
+          `⏰ [StayTag] user=${userId}, stayId=${stay.id} 가 5분 이상 머무름 → 카카오 태깅 시도`,
         );
 
         const place = await findStayedPlace(stay.lat, stay.lng);
@@ -281,18 +328,48 @@ router.post(
           tagged = true;
 
           // ✅ 이 머문 장소가 개인 Recommendation 테이블에 있으면 → 방문한 것으로 연결(stayId 세팅)
-          await prisma.recommendation.updateMany({
+          // ✅ 없으면 자동으로 Recommendation 생성 (achieved 목록에 표시되도록)
+          const existingRec = await prisma.recommendation.findFirst({
             where: {
               userId,
               kakaoPlaceId: place.id,
             },
-            data: {
-              stayId: updatedStay.id,
-            },
           });
+
+          if (existingRec) {
+            // 이미 있으면 stayId만 업데이트
+            await prisma.recommendation.update({
+              where: { id: existingRec.id },
+              data: {
+                stayId: updatedStay.id,
+              },
+            });
+          } else {
+            // 없으면 새로 생성 (score는 기본값 0)
+            await prisma.recommendation.create({
+              data: {
+                userId,
+                stayId: updatedStay.id,
+                kakaoPlaceId: place.id,
+                name: place.name,
+                categoryName: place.categoryName,
+                categoryGroupCode: place.categoryGroupCode,
+                mappedCategory: place.mappedCategory,
+                x: place.x,
+                y: place.y,
+                score: 0,
+              },
+            });
+            console.log(
+              `✨ [RecommendationCreated] user=${userId}, kakaoPlaceId=${place.id}, place=${place.name}`,
+            );
+          }
+
+          // ✅ 점수 지급은 기록 작성 시에만 지급 (GuildRecord 생성 시)
+          // Stay 생성 시에는 자동 점수 지급하지 않음
         } else {
           console.log(
-            `🟡 [StayTagSkipped] user=${userId}, stayId=${stay.id} → 10분 이상 머물렀지만 매칭 장소 없음`,
+            `🟡 [StayTagSkipped] user=${userId}, stayId=${stay.id} → 5분 이상 머물렀지만 매칭 장소 없음`,
           );
         }
       }

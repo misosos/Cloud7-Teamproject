@@ -571,13 +571,68 @@ router.get("/unified", authRequired, async (req: Request, res: Response) => {
     const stays = kakaoPlaceIds.length
       ? await prisma.stay.findMany({
           where: { userId, kakaoPlaceId: { in: kakaoPlaceIds } },
-          select: { kakaoPlaceId: true, endTime: true },
+          select: {
+            kakaoPlaceId: true,
+            endTime: true,
+            recommendationPointsAwardedAt: true,
+          },
         })
       : [];
 
     const visitedSet = new Set(stays.map((s) => s.kakaoPlaceId!));
+    const stayByKakaoPlaceId = new Map(
+      stays.map((s) => [s.kakaoPlaceId!, s]),
+    );
 
-    const achieved = recommendations.filter((r) => visitedSet.has(r.kakaoPlaceId));
+    // ✅ 이미 작성한 기록 확인 (guildId가 있으면 해당 길드, 없으면 사용자가 속한 첫 번째 길드)
+    const targetGuildId = ctx.guildId || (await prisma.guildMembership.findFirst({
+      where: {
+        userId,
+        status: "APPROVED",
+      },
+      select: { guildId: true },
+    }))?.guildId;
+
+    const achievedKakaoPlaceIds = recommendations
+      .filter((r) => visitedSet.has(r.kakaoPlaceId))
+      .map((r) => r.kakaoPlaceId);
+
+    const existingRecords = targetGuildId && achievedKakaoPlaceIds.length > 0
+      ? await prisma.guildRecord.findMany({
+          where: {
+            userId,
+            guildId: targetGuildId,
+            kakaoPlaceId: { in: achievedKakaoPlaceIds },
+          },
+          select: {
+            kakaoPlaceId: true,
+          },
+        })
+      : [];
+
+    const recordedKakaoPlaceIdSet = new Set(
+      existingRecords.map((r) => r.kakaoPlaceId!).filter(Boolean),
+    );
+
+    const achieved = recommendations
+      .filter((r) => visitedSet.has(r.kakaoPlaceId))
+      .map((r) => {
+        const stay = stayByKakaoPlaceId.get(r.kakaoPlaceId);
+        const hasRecord = targetGuildId
+          ? recordedKakaoPlaceIdSet.has(r.kakaoPlaceId)
+          : false;
+        return {
+          ...r,
+          stay: stay
+            ? {
+                endTime: stay.endTime,
+                awardedPoints:
+                  stay.recommendationPointsAwardedAt != null ? 50 : null,
+              }
+            : null,
+          hasRecord, // ✅ 이미 작성한 기록이 있는지 여부
+        };
+      });
     const pending = recommendations.filter((r) => !visitedSet.has(r.kakaoPlaceId));
 
     return res.json({
