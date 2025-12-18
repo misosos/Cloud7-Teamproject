@@ -451,26 +451,26 @@ export default function GuildMissionModal({
             <div className="space-y-3">
               {extraImageFiles.length > 0 && (
                 <div className="grid grid-cols-5 gap-3">
-                  {extraImageFiles.map((file, index) => (
-                    <div
-                      key={index}
-                      className="relative w-full aspect-square rounded-lg overflow-hidden border-2 border-[#6b4e2f] shadow-[0_4px_16px_rgba(0,0,0,0.5)] group bg-[#3a2818]"
+                {extraImageFiles.map((file, index) => (
+                  <div
+                    key={`${file.name}-${file.size}-${file.lastModified}`}
+                    className="relative w-full aspect-square rounded-lg overflow-hidden border-2 border-[#6b4e2f] shadow-[0_4px_16px_rgba(0,0,0,0.5)] group bg-[#3a2818]"
+                  >
+                    <img
+                      src={extraImagePreviews[index]}
+                      alt={`추가 이미지 ${index + 1}`}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveExtraImage(index)}
+                      className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 text-xs font-bold shadow-lg"
+                      title="삭제"
                     >
-                      <img
-                        src={extraImagePreviews[index]}
-                        alt={`추가 이미지 ${index + 1}`}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveExtraImage(index)}
-                        className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 text-xs font-bold shadow-lg"
-                        title="삭제"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+                      ×
+                    </button>
+                  </div>
+                ))}
                 </div>
               )}
               

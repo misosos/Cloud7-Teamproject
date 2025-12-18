@@ -653,7 +653,7 @@ export default function GuildRecordModal({
                 <div className="grid grid-cols-5 gap-3">
                   {extraImageFiles.map((file, index) => (
                     <div
-                      key={index}
+                      key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
                       className="relative w-full aspect-square rounded-lg overflow-hidden border-2 border-[#6b4e2f] shadow-[0_4px_16px_rgba(0,0,0,0.5)] group bg-[#3a2818]"
                     >
                       <img

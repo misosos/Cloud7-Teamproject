@@ -7,6 +7,7 @@ import { fetchMyGuildStatus } from "@/services/guildService";
 import { useNavigate } from "react-router-dom";
 import HeaderNav from "@/components/HeaderNav";
 import toast from "react-hot-toast";
+void GuildRecordDetailModal;
 
 const CATEGORY_FILTERS = [
   { label: "전체", value: "ALL" },
@@ -41,6 +42,9 @@ const UnifiedRecommendationsPage: React.FC = () => {
   // 기록 상세 모달 상태
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
+
+  void detailModalOpen; void setDetailModalOpen;
+  void selectedRecordId; void setSelectedRecordId;
   
   const navigate = useNavigate();
 
