@@ -20,6 +20,8 @@ import {
 import folderImage from "@/assets/ui/folder.png";
 import { resolveImageUrl } from "@/api/apiClient";
 
+void folderImage;
+
 const GuildHome: React.FC = () => {
   const navigate = useNavigate();
   const user = useAuthUser();
@@ -84,6 +86,10 @@ const GuildHome: React.FC = () => {
   const [completedMissions, setCompletedMissions] = useState<any[]>([]);
   const [loadingMissions, setLoadingMissions] = useState(false);
   const [missionPage, setMissionPage] = useState(1); // 연맹 미션 페이지네이션
+
+  void completedMissions; void setCompletedMissions;
+  void loadingMissions; void setLoadingMissions;
+  void missionPage; void setMissionPage;
 
   //  연맹 목록 불러오기 함수
   const loadGuilds = async () => {

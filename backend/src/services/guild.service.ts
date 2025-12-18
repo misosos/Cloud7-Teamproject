@@ -1,5 +1,5 @@
 // src/services/guild.service.ts
-import { prisma } from "../lib/prisma";
+import prisma from "../lib/prisma";
 
 /**
  * 프론트와 주고받는 길드 기본 DTO
@@ -1226,13 +1226,13 @@ export type NotificationDTO = {
   type: string;
   recordId: string | null;
   commentId: string | null;
-  guildId: string | null;
+  guildId: number | null;
   content: string | null;
   isRead: boolean;
   createdAt: string;
 };
 
-function serializeNotification(notification: any, fromUser?: any, guildId?: string | null): NotificationDTO {
+function serializeNotification(notification: any, fromUser?: any, guildId?: number | null): NotificationDTO {
   return {
     id: notification.id,
     userId: notification.userId,
@@ -1273,7 +1273,7 @@ export async function getUserNotifications(
   // 각 알림의 recordId를 통해 guildId 조회
   const notificationsWithGuildId = await Promise.all(
     notifications.map(async (n) => {
-      let guildId: string | null = null;
+      let guildId: number | null = null;
       if (n.recordId) {
         const record = await prisma.guildRecord.findUnique({
           where: { id: n.recordId },

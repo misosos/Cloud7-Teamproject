@@ -7,24 +7,24 @@ import prisma from "../lib/prisma";
  * - 해당 kakaoPlaceId가 Recommendation 테이블에 있으면 달성으로 판단
  * - GUILD 모드일 때만 점수 지급
  * - 중복 방지: recommendationPointsAwardedAt이 NULL일 때만 지급
- * 
+ *
  * 테스트/검증 시나리오:
  * 1. 같은 achieved를 API가 3번 호출돼도 점수는 50점 1번만 증가
  *    - recommendationPointsAwardedAt 필드로 중복 방지
  *    - 트랜잭션으로 원자성 보장
- * 
+ *
  * 2. 달성 전에는 점수 증가 없음, 달성 순간에만 증가
  *    - Recommendation 테이블에 kakaoPlaceId가 있어야 달성으로 판단
  *    - Stay의 recommendationPointsAwardedAt이 NULL일 때만 지급
- * 
+ *
  * 3. 트랜잭션 실패 시 점수/달성상태 불일치 없게
  *    - Stay 업데이트와 GuildScore 업데이트를 같은 트랜잭션으로 처리
  *    - 실패 시 롤백되어 일관성 유지
- * 
+ *
  * 4. GUILD 모드가 아닐 때는 점수 지급 안 함
  *    - detectGuildContext로 모드 판정
  *    - PERSONAL 모드면 false 반환
- * 
+ *
  * @param userId 사용자 ID
  * @param stayId Stay ID
  * @param kakaoPlaceId 카카오 장소 ID
@@ -70,8 +70,9 @@ export async function awardPointsForRecommendationAchievement(
 
   // 3) GUILD 모드인지 확인 (detectGuildContext 사용)
   const guildContext = await detectGuildContext(userId, lat, lng);
+  const guildId = guildContext.guildId; // ✅ null-safe 로컬 변수로 고정
 
-  if (guildContext.mode !== "GUILD" || guildContext.guildId == null) {
+  if (guildContext.mode !== "GUILD" || guildId == null) {
     // PERSONAL 모드이면 점수 지급 안 함
     return false;
   }
@@ -92,12 +93,12 @@ export async function awardPointsForRecommendationAchievement(
         where: {
           userId_guildId: {
             userId,
-            guildId: guildContext.guildId,
+            guildId, // ✅ 여기
           },
         },
         create: {
           userId,
-          guildId: guildContext.guildId,
+          guildId, // ✅ 여기
           score: 50,
         },
         update: {
@@ -109,7 +110,7 @@ export async function awardPointsForRecommendationAchievement(
     });
 
     console.log(
-      `✅ [RecommendationAchievement] user=${userId}, stayId=${stayId}, kakaoPlaceId=${kakaoPlaceId}, guildId=${guildContext.guildId}, +50점 지급`,
+      `✅ [RecommendationAchievement] user=${userId}, stayId=${stayId}, kakaoPlaceId=${kakaoPlaceId}, guildId=${guildId}, +50점 지급`,
     );
     return true;
   } catch (err) {
@@ -174,7 +175,9 @@ async function detectGuildContext(
   const nearbyByGuild = new Map<number, GuildNearbyInfo>();
 
   for (const mem of otherMemberships) {
-    const live = lives.find((l) => l.userId === mem.userId && l.lat != null && l.lng != null);
+    const live = lives.find(
+      (l) => l.userId === mem.userId && l.lat != null && l.lng != null,
+    );
     if (!live) continue;
 
     const dist = distanceMeters(lat, lng, live.lat!, live.lng!);
@@ -209,12 +212,7 @@ async function detectGuildContext(
 }
 
 // 거리 계산 함수
-function distanceMeters(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number,
-): number {
+function distanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
   const toRad = (d: number) => (d * Math.PI) / 180;
   const dLat = toRad(lat2 - lat1);
@@ -227,4 +225,3 @@ function distanceMeters(
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
-

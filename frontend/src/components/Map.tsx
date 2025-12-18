@@ -78,7 +78,7 @@ const KakaoMap = () => {
       }),
     });
 
-    const data = await res.json();
+    await res.json();
 
     if (!res.ok) {
       toast.error("머무름 정보 저장에 실패했습니다.");
