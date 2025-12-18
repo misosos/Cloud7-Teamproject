@@ -45,6 +45,11 @@ export const env = {
   // 브라우저에서 허용할 프론트엔드 오리진(도메인). 없으면 개발 기본값 사용.
   // 예) http://localhost:5173, https://your-app.com
   CORS_ORIGIN: required('CORS_ORIGIN', 'http://localhost:5173'),
+
+  // HTTPS 사용 여부(프록시/TLS termination 포함). 문자열로 관리하되 사용처에서 boolean으로 변환.
+  // 예) HTTPS=true  (https 환경)
+  //     HTTPS=false (http 환경)
+  HTTPS: process.env.HTTPS ?? 'false',
 };
 
 // [팁] 새 환경변수를 추가하고 싶다면?
