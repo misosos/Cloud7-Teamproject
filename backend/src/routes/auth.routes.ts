@@ -51,6 +51,13 @@
 
 import { Router } from 'express';
 import { me, register, login, logout } from '../controllers/auth.controller';
+import {
+  getKakaoAuthUrl,
+  getKakaoToken,
+  getKakaoUserInfo,
+  findOrCreateKakaoUser,
+} from '../services/kakaoAuth.service';
+import { env } from '../utils/env';
 // import authRequired from '../middlewares/authRequired';
 
 const router = Router();
@@ -157,5 +164,93 @@ router.post('/login', login);
  *   curl -i -b cookies.txt -X POST http://localhost:3000/api/auth/logout
  */
 router.post('/logout', logout);
+
+// ──────────────────────────────────────────────────────────────────────────
+// 카카오 소셜 로그인
+// ──────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /auth/kakao
+ *
+ * - 카카오 로그인 페이지로 리다이렉트합니다.
+ * - 프론트에서 이 URL로 이동하면 카카오 로그인 화면이 나타납니다.
+ *
+ * 사용 예시
+ *   window.location.href = '/api/auth/kakao';
+ *   또는
+ *   <a href="/api/auth/kakao">카카오로 로그인</a>
+ */
+router.get('/kakao', (req, res) => {
+  // 카카오 CLIENT_ID가 설정되지 않은 경우
+  if (!env.KAKAO_CLIENT_ID) {
+    return res.status(500).json({
+      ok: false,
+      error: 'KAKAO_CLIENT_ID가 설정되지 않았습니다.',
+    });
+  }
+
+  const kakaoAuthUrl = getKakaoAuthUrl();
+  res.redirect(kakaoAuthUrl);
+});
+
+/**
+ * GET /auth/kakao/callback
+ *
+ * - 카카오 로그인 후 돌아오는 콜백 URL입니다.
+ * - 카카오에서 인가 코드(code)를 받아 토큰 교환 → 사용자 정보 조회 → 세션 생성
+ * - 성공 시 프론트엔드 대시보드로 리다이렉트합니다.
+ *
+ * 쿼리 파라미터
+ *   - code: 카카오에서 받은 인가 코드
+ *   - error: 에러 발생 시 에러 코드
+ */
+router.get('/kakao/callback', async (req, res) => {
+  try {
+    const { code, error } = req.query;
+
+    // 카카오에서 에러를 반환한 경우 (사용자가 취소 등)
+    if (error) {
+      console.error('[카카오 로그인] 에러:', error);
+      return res.redirect(`${env.CORS_ORIGIN}/before-login?error=kakao_auth_failed`);
+    }
+
+    if (!code || typeof code !== 'string') {
+      return res.redirect(`${env.CORS_ORIGIN}/before-login?error=no_code`);
+    }
+
+    // 1) 인가 코드로 액세스 토큰 교환
+    const accessToken = await getKakaoToken(code);
+
+    // 2) 액세스 토큰으로 사용자 정보 조회
+    const kakaoUser = await getKakaoUserInfo(accessToken);
+
+    // 3) DB에서 사용자 찾거나 생성
+    const user = await findOrCreateKakaoUser(kakaoUser);
+
+    // 4) 세션에 사용자 정보 저장
+    (req.session as any).user = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      profileImage: user.profileImage,
+      provider: user.provider,
+    };
+
+    // 5) 세션 저장 후 프론트엔드로 리다이렉트
+    req.session.save((err) => {
+      if (err) {
+        console.error('[카카오 로그인] 세션 저장 실패:', err);
+        return res.redirect(`${env.CORS_ORIGIN}/before-login?error=session_save_failed`);
+      }
+
+      console.log(`✅ [카카오 로그인] 성공: userId=${user.id}, email=${user.email}`);
+      res.redirect(`${env.CORS_ORIGIN}/dashboard`);
+    });
+  } catch (err: any) {
+    console.error('[카카오 로그인] 콜백 처리 실패:', err?.response?.data || err.message);
+    res.redirect(`${env.CORS_ORIGIN}/before-login?error=kakao_callback_failed`);
+  }
+});
 
 export default router;

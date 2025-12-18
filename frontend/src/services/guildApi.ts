@@ -100,19 +100,25 @@ export async function fetchGuildList(): Promise<GuildListItem[]> {
   // axios 기본 형태: res.data = { ok, data }
   const list = res.data;
 
-  return list.map((g) => ({
-    id: String(g.id),
-    name: g.name,
-    intro: g.description ?? "",
-    //  백엔드 tags 문자열 배열  프론트 태그로 그대로 사용
-    tags: (g.tags ?? []) as GuildTag[],
-    // 멤버 수: 백엔드에서 계산된 memberCount 사용
-    currentMembers: g.memberCount ?? 0,
-    // 일단 최대 인원은 임시 값 
-    maxMembers: g.maxMembers ?? 20,
-    status: "모집 중",
-    ownerId: g.ownerId,
-  }));
+  return list.map((g) => {
+    const currentMembers = g.memberCount ?? 0;
+    const maxMembers = g.maxMembers ?? 20;
+    // 인원이 다 차면 "모집 마감", 아니면 "모집 중"
+    const status = currentMembers >= maxMembers ? "모집 마감" : "모집 중";
+    
+    return {
+      id: String(g.id),
+      name: g.name,
+      intro: g.description ?? "",
+      //  백엔드 tags 문자열 배열  프론트 태그로 그대로 사용
+      tags: (g.tags ?? []) as GuildTag[],
+      // 멤버 수: 백엔드에서 계산된 memberCount 사용
+      currentMembers,
+      maxMembers,
+      status,
+      ownerId: g.ownerId,
+    };
+  });
 }
 
 

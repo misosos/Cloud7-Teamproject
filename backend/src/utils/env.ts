@@ -45,6 +45,16 @@ export const env = {
   // 브라우저에서 허용할 프론트엔드 오리진(도메인). 없으면 개발 기본값 사용.
   // 예) http://localhost:5173, https://your-app.com
   CORS_ORIGIN: required('CORS_ORIGIN', 'http://localhost:5173'),
+
+  // ─────────────────────────────────────────────────────────
+  // 카카오 소셜 로그인 설정
+  // ─────────────────────────────────────────────────────────
+  // 카카오 REST API 키 (개발자 콘솔에서 발급)
+  KAKAO_CLIENT_ID: process.env.KAKAO_CLIENT_ID ?? '',
+  // 카카오 클라이언트 시크릿 (선택사항, 활성화한 경우 필요)
+  KAKAO_CLIENT_SECRET: process.env.KAKAO_CLIENT_SECRET ?? '',
+  // 카카오 로그인 후 돌아올 콜백 URL
+  KAKAO_REDIRECT_URI: process.env.KAKAO_REDIRECT_URI ?? 'http://localhost:3000/api/auth/kakao/callback',
 };
 
 // [팁] 새 환경변수를 추가하고 싶다면?

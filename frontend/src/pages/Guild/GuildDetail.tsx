@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import HeaderNav from "@/components/HeaderNav";
 import toast from "react-hot-toast";
-import { joinGuildBackend, getGuildById, type GuildDTO } from "@/services/guildService";
+import { joinGuildBackend, getGuildById, getGuildMembers, type GuildDTO } from "@/services/guildService";
 import { useGuildStatus } from "@/hooks/useGuildStatus";
 import { resolveImageUrl } from "@/api/apiClient";
 
@@ -20,10 +20,14 @@ const GuildDetail: React.FC = () => {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [showJoinForm, setShowJoinForm] = useState(false);
   const [joinMessage, setJoinMessage] = useState("");
+  const [memberCount, setMemberCount] = useState(0); // 현재 멤버 수
 
   // 내가 이미 가입한 연맹인지 확인
   const isMyGuild = myGuildStatus?.guild?.id === Number(guildId);
   const isPending = myGuildStatus?.status === "PENDING";
+  
+  // 모집 마감 여부 확인
+  const isClosed = guild ? memberCount >= (guild.maxMembers ?? 20) : false;
 
   useEffect(() => {
     if (!guildId) {
@@ -42,6 +46,14 @@ const GuildDetail: React.FC = () => {
           setNotFound(true);
         } else {
           setGuild(res);
+          
+          // 멤버 수 조회
+          try {
+            const members = await getGuildMembers(Number(guildId));
+            setMemberCount(members?.length ?? 0);
+          } catch {
+            setMemberCount(0);
+          }
         }
       } catch (err) {
         console.error(err);
@@ -183,7 +195,17 @@ const GuildDetail: React.FC = () => {
                 <p className="text-xs uppercase tracking-[0.12em] text-[#8b6f47] font-bold">
                   모집 여부
                 </p>
-                <p className="text-lg font-black text-green-500">모집 중</p>
+                <p className={`text-lg font-black ${isClosed ? "text-red-500" : "text-green-500"}`}>
+                  {isClosed ? "모집 마감" : "모집 중"}
+                </p>
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-xs uppercase tracking-[0.12em] text-[#8b6f47] font-bold">
+                  현재 인원
+                </p>
+                <p className="font-black text-[#f4d7aa]">
+                  {memberCount} / {guild.maxMembers ?? 20}명
+                </p>
               </div>
               {guild.category && (
                 <div className="space-y-0.5">

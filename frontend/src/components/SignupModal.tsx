@@ -440,6 +440,35 @@ const fallbackAuthenticate = async ({
               {loading ? "⏳ 처리 중..." : `⚔️ ${cta}`}
             </button>
 
+            {/* 구분선 */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-[#4a3420]" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="px-3 bg-gradient-to-b from-[#6b4e2f] to-[#5a3e25] text-[#8b6f47] font-medium">
+                  또는
+                </span>
+              </div>
+            </div>
+
+            {/* 카카오 로그인 버튼 */}
+            <button
+              type="button"
+              onClick={() => {
+                // 카카오 로그인 페이지로 이동
+                window.location.href = '/api/auth/kakao';
+              }}
+              disabled={loading}
+              className="w-full py-3 rounded-lg bg-[#FEE500] text-[#000000] text-sm font-bold tracking-wide hover:bg-[#FDD800] transition-all shadow-[0_4px_12px_rgba(0,0,0,0.3)] active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {/* 카카오 로고 SVG */}
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path fillRule="evenodd" clipRule="evenodd" d="M9 0C4.02944 0 0 3.13401 0 7C0 9.38756 1.55732 11.4691 3.93478 12.6354L2.93217 16.5627C2.84739 16.9069 3.2353 17.1744 3.52577 16.9644L8.14068 13.8679C8.42298 13.8893 8.70959 13.9 9 13.9C13.9706 13.9 18 10.766 18 6.9C18 3.13401 13.9706 0 9 0Z" fill="#000000"/>
+              </svg>
+              카카오로 {isSignup ? "시작하기" : "로그인"}
+            </button>
+
             {/* 모드 전환(회원가입 ↔ 로그인) */}
             <div className="text-center">
               <button
