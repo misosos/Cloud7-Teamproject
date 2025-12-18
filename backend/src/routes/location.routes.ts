@@ -1,5 +1,5 @@
 // src/routes/location.routes.ts
-import { Router, type Response } from "express";
+import { Router, type Request, type Response } from "express";
 import authRequired, { type AuthedRequest } from "../middlewares/authRequired";
 import prisma from "../lib/prisma";
 import axios from "axios";
@@ -221,9 +221,9 @@ async function findNearbyPlaces(
 router.post(
   "/update",
   authRequired,
-  async (req: AuthedRequest, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
-      const { currentUser } = req;
+      const { currentUser } = req as AuthedRequest;
       if (!currentUser) {
         return res.status(401).json({ ok: false, error: "UNAUTHORIZED" });
       }
@@ -398,9 +398,9 @@ router.post(
 router.post(
   "/clear",
   authRequired,
-  async (req: AuthedRequest, res: Response) => {
+  async (req: Request, res: Response) => {
     try {
-      const { currentUser } = req;
+      const { currentUser } = req as AuthedRequest;
       if (!currentUser) {
         return res.status(401).json({ ok: false, error: "UNAUTHORIZED" });
       }
