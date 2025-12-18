@@ -52,7 +52,7 @@ const isProd = env.NODE_ENV === "production";
 
 // ⚠️ 지금 네 배포는 "production"이더라도 HTTP 환경일 수 있음(학교 포트/도메인)
 //    => 쿠키 secure(true) 쓰면 브라우저가 쿠키를 버려서 로그인 유지가 깨짐
-const isHttps = env.HTTPS === "true"; // (선택) .env에 HTTPS=true 넣으면 https로 간주
+const isHttps = String(env.HTTPS).toLowerCase() === "true";// (선택) .env에 HTTPS=true 넣으면 https로 간주
 
 const allowedOrigins = (env.CORS_ORIGIN ?? "")
   .split(",")
