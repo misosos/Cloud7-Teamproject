@@ -56,5 +56,8 @@ export interface UnifiedRecommendationsResponse {
 
 /** 통합 추천 조회 (개인/연맹 + 달성 도감) */
 export const fetchUnifiedRecommendations = () => {
-  return httpGet<UnifiedRecommendationsResponse>("/recommendations/unified");
+  // ✅ 캐시 비활성화: 카카오 로그인 후 이전 세션의 빈 응답이 캐시되는 문제 방지
+  return httpGet<UnifiedRecommendationsResponse>("/recommendations/unified", undefined, {
+    cache: 'no-store',
+  });
 };

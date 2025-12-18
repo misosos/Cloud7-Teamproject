@@ -1,5 +1,5 @@
 // src/components/UnifiedRecommendationsPage.tsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { fetchUnifiedRecommendations } from "@/api/recommendations";
 import GuildRecordModal from "@/components/GuildRecordModal";
 import GuildRecordDetailModal from "@/components/GuildRecordDetailModal";
@@ -20,6 +20,55 @@ const CATEGORY_FILTERS = [
   { label: "식당", value: "식당" },
 ];
 
+/**
+ * 현재 위치를 서버에 전송하는 헬퍼 함수
+ * - 카카오 로그인 후 페이지 리다이렉트 시 위치 정보가 아직 전송되지 않았을 수 있음
+ * - 추천 조회 전에 위치를 먼저 전송하여 데이터가 비어있는 문제 방지
+ */
+const sendCurrentLocation = (): Promise<boolean> => {
+  return new Promise((resolve) => {
+    if (!navigator.geolocation) {
+      console.warn("[UnifiedRecommendations] geolocation not supported");
+      resolve(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const response = await fetch("/api/location/update", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ lat: latitude, lng: longitude }),
+          });
+          
+          if (response.ok) {
+            console.log("[UnifiedRecommendations] 위치 전송 성공");
+            resolve(true);
+          } else {
+            console.warn("[UnifiedRecommendations] 위치 전송 실패:", response.status);
+            resolve(false);
+          }
+        } catch (err) {
+          console.error("[UnifiedRecommendations] 위치 전송 에러:", err);
+          resolve(false);
+        }
+      },
+      (err) => {
+        console.warn("[UnifiedRecommendations] 위치 가져오기 실패:", err.message);
+        resolve(false);
+      },
+      {
+        enableHighAccuracy: false,
+        timeout: 10000,
+        maximumAge: 60000,
+      }
+    );
+  });
+};
+
 const UnifiedRecommendationsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<"PERSONAL" | "GUILD">("PERSONAL");
@@ -31,6 +80,7 @@ const UnifiedRecommendationsPage: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [guildId, setGuildId] = useState<number | null>(null);
   const [userGuildId, setUserGuildId] = useState<number | null>(null); // 사용자가 속한 길드 ID (PERSONAL 모드용)
+  const [locationMessage, setLocationMessage] = useState<string | null>(null);
   
   // 기록 작성 모달 상태
   const [recordModalOpen, setRecordModalOpen] = useState(false);
@@ -48,35 +98,68 @@ const UnifiedRecommendationsPage: React.FC = () => {
   
   const navigate = useNavigate();
 
-  useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const data = await fetchUnifiedRecommendations();
-        if (!data.ok) throw new Error("failed");
-        setMode(data.mode);
-        setGuildName(data.guildName ?? null);
-        setGuildId(data.guildId ?? null);
-        setNearbyGuildCount(data.nearbyGuildMemberCount ?? 0);
-        setPending(data.pending || []);
-        setAchieved(data.achieved || []);
-        
-        // 디버깅: 현재 상태 확인
-        console.log("[UnifiedRecommendations] 상태:", {
-          mode: data.mode,
-          guildId: data.guildId,
-          pendingCount: data.pending?.length || 0,
-          achievedCount: data.achieved?.length || 0,
-        });
-      } catch (err) {
-        console.error(err);
-        setError("추천지를 불러오지 못했어요.");
-      } finally {
-        setLoading(false);
+  // 추천 데이터 로드 함수
+  const loadRecommendations = useCallback(async (retryWithLocation = false) => {
+    try {
+      setLoading(true);
+      setError(null);
+      setLocationMessage(null);
+      
+      // 재시도 시 먼저 위치 전송
+      if (retryWithLocation) {
+        console.log("[UnifiedRecommendations] 위치 전송 후 재시도...");
+        await sendCurrentLocation();
+        // 위치 전송 후 서버가 처리할 시간을 조금 줌
+        await new Promise((r) => setTimeout(r, 500));
       }
-    })();
+      
+      const data = await fetchUnifiedRecommendations();
+      if (!data.ok) throw new Error("failed");
+      
+      setMode(data.mode);
+      setGuildName(data.guildName ?? null);
+      setGuildId(data.guildId ?? null);
+      setNearbyGuildCount(data.nearbyGuildMemberCount ?? 0);
+      setPending(data.pending || []);
+      setAchieved(data.achieved || []);
+      
+      // 위치 정보가 없어서 결과가 비어있는 경우 메시지 표시
+      if ((data as any).message) {
+        setLocationMessage((data as any).message);
+      }
+      
+      // 디버깅: 현재 상태 확인
+      console.log("[UnifiedRecommendations] 상태:", {
+        mode: data.mode,
+        guildId: data.guildId,
+        pendingCount: data.pending?.length || 0,
+        achievedCount: data.achieved?.length || 0,
+        message: (data as any).message,
+      });
+      
+      // 처음 로드 시 결과가 비어있고, 재시도하지 않은 경우 → 위치 전송 후 재시도
+      if (!retryWithLocation && data.pending?.length === 0 && data.achieved?.length === 0) {
+        console.log("[UnifiedRecommendations] 결과가 비어있어서 위치 전송 후 재시도합니다.");
+        await loadRecommendations(true);
+        return;
+      }
+    } catch (err) {
+      console.error(err);
+      setError("추천지를 불러오지 못했어요.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    // 페이지 진입 시 먼저 위치를 전송하고 추천 조회
+    (async () => {
+      // 먼저 현재 위치 전송 시도 (카카오 로그인 후 리다이렉트 시 위치가 아직 없을 수 있음)
+      await sendCurrentLocation();
+      // 추천 데이터 로드
+      await loadRecommendations(false);
+    })();
+  }, [loadRecommendations]);
 
   // 사용자가 속한 길드 조회 (PERSONAL 모드에서도 기록 작성 가능하도록)
   useEffect(() => {
@@ -172,8 +255,16 @@ const UnifiedRecommendationsPage: React.FC = () => {
         {!loading && !error && filteredPending.length === 0 && (
           <div className="bg-gradient-to-b from-[#5a3e25] to-[#4a3420] rounded-lg border-2 border-[#6b4e2f] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4),0_8px_24px_rgba(0,0,0,0.4)] p-5">
             <p className="text-base text-[#d4a574] font-medium">
-              아직 추천할 장소가 없어요. 조금 더 돌아다니면 취향을 파악해볼게요 ☕
+              {locationMessage || "아직 추천할 장소가 없어요. 조금 더 돌아다니면 취향을 파악해볼게요 ☕"}
             </p>
+            {locationMessage && (
+              <button
+                onClick={() => loadRecommendations(true)}
+                className="mt-3 rounded-lg bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] px-4 py-2 text-sm font-bold text-white hover:from-[#9b7f57] hover:to-[#7b5e3f] transition-all shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)] border border-[#c9a961]/30"
+              >
+                🔄 다시 시도
+              </button>
+            )}
           </div>
         )}
 

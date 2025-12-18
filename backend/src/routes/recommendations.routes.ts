@@ -513,6 +513,11 @@ router.get("/", authRequired, async (req: Request, res: Response) => {
  * ────────────────────────────────────────────── */
 
 router.get("/unified", authRequired, async (req: Request, res: Response) => {
+  // ✅ 브라우저 캐시 방지 (카카오 로그인 후 빈 응답이 캐시되는 문제 해결)
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+  res.set("Pragma", "no-cache");
+  res.set("Expires", "0");
+
   try {
     const currentUser = req.currentUser!;
     const userId = Number(currentUser.id);
@@ -531,8 +536,25 @@ router.get("/unified", authRequired, async (req: Request, res: Response) => {
       include: { stay: true },
     });
 
-    // ✅ 2) 비어 있으면 자동 rebuild(= stay 없어도 Kakao 기반으로 채워짐)
-    if (AUTO_REBUILD_ON_EMPTY && recommendations.length === 0) {
+    // ✅ 2) 비어 있거나, 모두 방문 완료(pending=0)면 자동 rebuild
+    //    → 새로운 위치에서 새로운 추천을 받아야 하므로
+    const needsRebuild = await (async () => {
+      if (!AUTO_REBUILD_ON_EMPTY) return false;
+      if (recommendations.length === 0) return true;
+
+      // 모든 추천 장소를 이미 방문했는지 확인 (pending이 비어있는지)
+      const kakaoIds = recommendations.map((r) => r.kakaoPlaceId);
+      const visitedStays = await prisma.stay.findMany({
+        where: { userId, kakaoPlaceId: { in: kakaoIds } },
+        select: { kakaoPlaceId: true },
+      });
+      const visitedSet = new Set(visitedStays.map((s) => s.kakaoPlaceId));
+      const pendingCount = recommendations.filter((r) => !visitedSet.has(r.kakaoPlaceId)).length;
+
+      return pendingCount === 0; // pending이 비어있으면 rebuild 필요
+    })();
+
+    if (needsRebuild) {
       const live = await prisma.liveLocation.findUnique({ where: { userId } });
 
       if (!live || live.lat == null || live.lng == null) {
@@ -550,6 +572,8 @@ router.get("/unified", authRequired, async (req: Request, res: Response) => {
             "현재 위치 정보가 없습니다. 위치 권한을 허용하고 앱을 한 번 움직여 주세요.",
         });
       }
+
+      console.log(`[Recommendations] userId=${userId} pending=0 → auto rebuild 실행`);
 
       await rebuildForUser({
         userId,

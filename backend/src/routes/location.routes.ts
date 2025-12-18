@@ -244,11 +244,25 @@ router.post(
       const now = new Date();
 
       // 1) LiveLocation upsert (현재 위치)
-      await prisma.liveLocation.upsert({
-        where: { userId },
-        update: { lat: latNum, lng: lngNum },
-        create: { userId, lat: latNum, lng: lngNum },
-      });
+      // race condition 방지: 동시 요청 시 P2002 에러 발생 가능
+      try {
+        await prisma.liveLocation.upsert({
+          where: { userId },
+          update: { lat: latNum, lng: lngNum },
+          create: { userId, lat: latNum, lng: lngNum },
+        });
+      } catch (err: any) {
+        // P2002: Unique constraint failed - 동시 요청으로 인한 충돌
+        if (err?.code === "P2002") {
+          // 이미 레코드가 존재하므로 update로 재시도
+          await prisma.liveLocation.update({
+            where: { userId },
+            data: { lat: latNum, lng: lngNum },
+          });
+        } else {
+          throw err;
+        }
+      }
 
       // 2) Stay 처리 (이전 stay와 비교)
       let stay = await prisma.stay.findFirst({
