@@ -791,55 +791,86 @@ const GuildRoom: React.FC = () => {
                 {guildMissions.map((mission) => {
                   const isDeleting = deletingMissionIds.has(mission.id);
                   
-                  const handleDeleteMission = async (e: React.MouseEvent) => {
+                  const handleDeleteMission = (e: React.MouseEvent) => {
                     e.stopPropagation(); // 클릭 이벤트 전파 방지
-                    if (!window.confirm(`"${mission.title}" 미션을 삭제하시겠습니까?`)) return;
                     
-                    setDeletingMissionIds((prev) => new Set(prev).add(mission.id));
-                    try {
-                      const response = await fetch(`/api/guilds/${guildId}/missions/${mission.id}`, {
-                        method: "DELETE",
-                        credentials: "include",
-                      });
+                    // 토스트로 확인 메시지 표시
+                    toast((t) => (
+                      <div className="flex flex-col gap-3">
+                        <p className="font-medium text-stone-800">
+                          "{mission.title}" 미션을 삭제하시겠습니까?
+                        </p>
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            onClick={() => toast.dismiss(t.id)}
+                            className="px-3 py-1.5 text-sm bg-stone-200 hover:bg-stone-300 text-stone-700 rounded-lg transition-colors"
+                          >
+                            취소
+                          </button>
+                          <button
+                            onClick={async () => {
+                              toast.dismiss(t.id);
+                              setDeletingMissionIds((prev) => new Set(prev).add(mission.id));
+                              try {
+                                const response = await fetch(`/api/guilds/${guildId}/missions/${mission.id}`, {
+                                  method: "DELETE",
+                                  credentials: "include",
+                                });
 
-                      if (!response.ok) {
-                        const errorText = await response.text();
-                        let errorMessage = "미션 삭제에 실패했습니다.";
-                        try {
-                          const errorJson = JSON.parse(errorText);
-                          errorMessage = errorJson.message || errorMessage;
-                        } catch {
-                          errorMessage = errorText || errorMessage;
-                        }
-                        throw new Error(errorMessage);
-                      }
+                                if (!response.ok) {
+                                  const errorText = await response.text();
+                                  let errorMessage = "미션 삭제에 실패했습니다.";
+                                  try {
+                                    const errorJson = JSON.parse(errorText);
+                                    errorMessage = errorJson.message || errorMessage;
+                                  } catch {
+                                    errorMessage = errorText || errorMessage;
+                                  }
+                                  throw new Error(errorMessage);
+                                }
 
-                      const json = await response.json();
-                      if (!json.ok) {
-                        throw new Error(json.message || "미션 삭제에 실패했습니다.");
-                      }
+                                const json = await response.json();
+                                if (!json.ok) {
+                                  throw new Error(json.message || "미션 삭제에 실패했습니다.");
+                                }
 
-                      toast.success("미션이 삭제되었습니다.");
-                      // 미션 목록 다시 로드
-                      const missionsResponse = await fetch(`/api/guilds/${guildId}/missions`, {
-                        credentials: "include",
-                      });
-                      if (missionsResponse.ok) {
-                        const missionsJson = await missionsResponse.json();
-                        if (missionsJson.ok && missionsJson.data) {
-                          setGuildMissions(missionsJson.data);
-                        }
-                      }
-                    } catch (err: any) {
-                      console.error("미션 삭제 실패", err);
-                      toast.error(err?.message || "미션 삭제에 실패했습니다.");
-                    } finally {
-                      setDeletingMissionIds((prev) => {
-                        const newSet = new Set(prev);
-                        newSet.delete(mission.id);
-                        return newSet;
-                      });
-                    }
+                                toast.success("미션이 삭제되었습니다.");
+                                // 미션 목록 다시 로드
+                                const missionsResponse = await fetch(`/api/guilds/${guildId}/missions`, {
+                                  credentials: "include",
+                                });
+                                if (missionsResponse.ok) {
+                                  const missionsJson = await missionsResponse.json();
+                                  if (missionsJson.ok && missionsJson.data) {
+                                    setGuildMissions(missionsJson.data);
+                                  }
+                                }
+                              } catch (err: any) {
+                                console.error("미션 삭제 실패", err);
+                                toast.error(err?.message || "미션 삭제에 실패했습니다.");
+                              } finally {
+                                setDeletingMissionIds((prev) => {
+                                  const newSet = new Set(prev);
+                                  newSet.delete(mission.id);
+                                  return newSet;
+                                });
+                              }
+                            }}
+                            className="px-3 py-1.5 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                          >
+                            삭제
+                          </button>
+                        </div>
+                      </div>
+                    ), {
+                      duration: 10000, // 10초 동안 표시
+                      style: {
+                        background: '#fff',
+                        padding: '16px',
+                        borderRadius: '12px',
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                      },
+                    });
                   };
 
                   return (

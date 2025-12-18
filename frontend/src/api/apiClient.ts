@@ -33,7 +33,8 @@ export const API_ORIGIN: string = API_BASE.replace(/\/api$/, '');
 /**
  * 이미지 URL을 절대 경로로 변환하는 헬퍼 함수
  * - 이미 http(s)로 시작하는 절대 URL이면 그대로 반환
- * - /uploads/... 같은 상대 경로면 API_ORIGIN을 붙여서 절대 경로로 변환
+ * - /uploads/... 같은 상대 경로면 /api/uploads/...로 변환하여 API 경로로 요청
+ *   (배포 환경에서 SPA catch-all 라우트가 /api 외 경로를 index.html로 보내는 문제 방지)
  */
 export function resolveImageUrl(imageUrl?: string | null): string | null {
   if (!imageUrl) return null;
@@ -43,7 +44,18 @@ export function resolveImageUrl(imageUrl?: string | null): string | null {
     return imageUrl;
   }
   
-  // /uploads/... 같은 상대 경로면 API_ORIGIN을 붙임
+  // 이미 /api/uploads/... 형태면 그대로 사용
+  if (imageUrl.startsWith('/api/uploads/')) {
+    return imageUrl;
+  }
+  
+  // /uploads/... 경로를 /api/uploads/...로 변환
+  // (배포 환경에서 /uploads가 SPA catch-all에 걸리지 않도록)
+  if (imageUrl.startsWith('/uploads/')) {
+    return `/api${imageUrl}`;
+  }
+  
+  // 그 외 /로 시작하는 경로는 API_ORIGIN을 붙임
   if (imageUrl.startsWith('/')) {
     return `${API_ORIGIN}${imageUrl}`;
   }
@@ -72,6 +84,7 @@ export type RequestOptions = {
   headers?: Record<string, string>;
   timeoutMs?: number; // 기본 15000ms
   withCredentials?: boolean; // 기본 true
+  cache?: RequestCache; // 캐시 정책 (예: 'no-store')
 };
 
 // 주어진 path가 'http://' 또는 'https://'로 시작하는 절대 URL인지 여부를 판단
@@ -155,6 +168,7 @@ export async function request<T>(
     headers,
     timeoutMs = DEFAULT_TIMEOUT,
     withCredentials = true,
+    cache,
   } = options || {};
 
   const url = buildUrl(path, params);
@@ -170,6 +184,7 @@ export async function request<T>(
       ...(headers || {}),
     },
     signal: controller.signal,
+    ...(cache ? { cache } : {}), // 캐시 정책 설정
   };
 
   if (data && method !== 'GET') {
