@@ -46,6 +46,8 @@ export const env = {
   // 예) http://localhost:5173, https://your-app.com
   CORS_ORIGIN: required('CORS_ORIGIN', 'http://localhost:5173'),
 
+  HTTPS: (process.env.HTTPS ?? "false") === "true",
+
   // ─────────────────────────────────────────────────────────
   // 카카오 소셜 로그인 설정
   // ─────────────────────────────────────────────────────────
