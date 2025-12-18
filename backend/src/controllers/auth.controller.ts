@@ -46,6 +46,8 @@ type PublicUser = {
   email: string;
   name: string;
   role: string;
+  profileImage?: string | null;  // 프로필 이미지 URL (카카오 등 소셜 로그인)
+  provider?: string | null;      // 로그인 제공자 (local, kakao, google 등)
 } & Record<string, any>;
 
 /** 서비스에서 넘어오는 원시 사용자 타입(이름/역할이 null일 수 있음) */
@@ -54,6 +56,8 @@ type UserLike = {
   email: string;
   name?: string | null;
   role?: string | null;
+  profileImage?: string | null;
+  provider?: string | null;
 } & Record<string, any>;
 
 /**
@@ -81,6 +85,10 @@ const toPublicUser = (u?: UserLike | null): PublicUser | null => {
         : (u.email?.split?.('@')?.[0] ?? ''),
     // 역할 정보가 없으면 기본값 'user'
     role: (u.role ?? 'user') as string,
+    // 프로필 이미지 URL (카카오 등 소셜 로그인 시 사용)
+    profileImage: u.profileImage ?? null,
+    // 로그인 제공자 (local, kakao, google 등)
+    provider: u.provider ?? 'local',
   };
 };
 

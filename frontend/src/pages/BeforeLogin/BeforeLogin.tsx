@@ -111,14 +111,14 @@ export default function BeforeLogin() {
   //    로그인 전/후 화면을 번갈아 깜빡이지 않도록 간단한 로딩 화면만 보여줍니다.
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center text-stone-500 text-sm">
-        로그인 상태를 확인하는 중입니다...
+      <div className="min-h-screen bg-[#fdf8f1] flex items-center justify-center">
+        <p className="text-sm text-[#6b4e2f] font-medium">로그인 상태를 확인하는 중입니다...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen text-stone-800">
+    <div className="min-h-screen bg-[#fdf8f1] text-stone-800">
       {/**
        * 상단 네비게이션(잠금 모드)
        * - 로그인 전에는 서비스 내비게이션을 사용할 수 없도록 잠급니다.
@@ -135,29 +135,33 @@ export default function BeforeLogin() {
         <Hero />
 
         {/* 중앙 CTA: 로그인 / 회원가입 버튼 */}
-        <div className="mt-10 flex justify-center gap-4">
+        <div className="mt-10 flex justify-center gap-5">
           <button
             type="button"
             onClick={() => openAuth("login")}
-            className="px-5 py-2.5 rounded-md bg-amber-800 text-white text-sm shadow hover:bg-amber-900 transition"
+            className="px-8 py-3 rounded-lg bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white text-sm font-black tracking-wide hover:from-[#9b7f57] hover:to-[#7b5e3f] transition-all shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)] border border-[#c9a961]/30 active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]"
             aria-label="로그인하기"
           >
-            로그인
+            ⚔️ 로그인
           </button>
           <button
             type="button"
             onClick={() => openAuth("signup")}
-            className="px-5 py-2.5 rounded-md ring-1 ring-stone-300 text-stone-700 hover:bg-stone-100 text-sm transition"
+            className="px-8 py-3 rounded-lg bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] text-sm font-black tracking-wide hover:from-[#5a4430] hover:to-[#4a3828] transition-all shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)] border-2 border-[#6b4e2f] active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]"
             aria-label="회원가입하기"
           >
-            회원가입
+            📜 회원가입
           </button>
         </div>
       </main>
 
       {/* 풋터(간단 저작권 표기) */}
-      <footer className="mt-16 py-10 text-center text-xs text-stone-500">
-        © {new Date().getFullYear()} 취향도감. All rights reserved.
+      <footer className="mt-16 py-10 text-center relative">
+        {/* 장식 라인 */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-px bg-gradient-to-r from-transparent via-[#c9a961] to-transparent" />
+        <p className="text-xs text-[#8b6f47] font-medium">
+          © {new Date().getFullYear()} 취향도감. All rights reserved.
+        </p>
       </footer>
 
       {/**

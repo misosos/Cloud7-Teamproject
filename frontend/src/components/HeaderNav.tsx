@@ -33,6 +33,9 @@ export default function HeaderNav({
   const [open, setOpen] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  
+  // 프로필 이미지 라이트박스 모달
+  const [showProfileLightbox, setShowProfileLightbox] = useState(false);
 
   // ----- 전역 Auth 스토어 연동 -----
   // 세션 사용자 (session?.user | user 어느 쪽이든 대응)
@@ -167,11 +170,31 @@ export default function HeaderNav({
               {user ? (
                 <>
                   <NotificationBell />
+                  {/* 프로필 이미지 (있으면 표시, 클릭 시 라이트박스) */}
+                  {user?.profileImage ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowProfileLightbox(true)}
+                      className="hidden md:block w-8 h-8 rounded-full overflow-hidden ring-2 ring-stone-200 hover:ring-amber-400 transition-all cursor-pointer"
+                      title="프로필 이미지 크게 보기"
+                    >
+                      <img
+                        src={user.profileImage}
+                        alt="프로필"
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ) : (
+                    <div className="hidden md:flex w-8 h-8 rounded-full bg-gradient-to-br from-amber-100 to-amber-200 items-center justify-center text-amber-700 text-sm font-bold ring-2 ring-stone-200">
+                      {(user?.name || user?.email || "U")[0].toUpperCase()}
+                    </div>
+                  )}
+                  {/* 닉네임(이름) 우선 표시, 없으면 이메일 */}
                   <span
-                    className="hidden md:inline text-sm text-stone-600 truncate max-w-[160px]"
+                    className="hidden md:inline text-sm text-stone-600 truncate max-w-[120px] font-medium"
                     title={user?.email ?? ""}
                   >
-                    {(user?.email ?? "") + " 님"}
+                    {(user?.name || user?.email || "사용자") + " 님"}
                   </span>
                   <button
                     onClick={handleLogout}
@@ -210,12 +233,33 @@ export default function HeaderNav({
 
               {/* 모바일 전용 로그인/로그아웃 버튼 */}
               {user ? (
-                <button
-                  onClick={handleLogout}
-                  className="md:hidden inline-flex items-center text-xs px-2.5 py-1.5 rounded-md ring-1 ring-stone-300 text-stone-700 hover:bg-stone-100 transition"
-                >
-                  로그아웃
-                </button>
+                <>
+                  {/* 모바일 프로필 이미지 */}
+                  {user?.profileImage ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowProfileLightbox(true)}
+                      className="md:hidden w-7 h-7 rounded-full overflow-hidden ring-2 ring-stone-200 hover:ring-amber-400 transition-all"
+                      title="프로필 이미지 크게 보기"
+                    >
+                      <img
+                        src={user.profileImage}
+                        alt="프로필"
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ) : (
+                    <div className="md:hidden w-7 h-7 rounded-full bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center text-amber-700 text-xs font-bold ring-2 ring-stone-200">
+                      {(user?.name || user?.email || "U")[0].toUpperCase()}
+                    </div>
+                  )}
+                  <button
+                    onClick={handleLogout}
+                    className="md:hidden inline-flex items-center text-xs px-2.5 py-1.5 rounded-md ring-1 ring-stone-300 text-stone-700 hover:bg-stone-100 transition"
+                  >
+                    로그아웃
+                  </button>
+                </>
               ) : authButtons !== "none" ? (
                 <button
                   onClick={openLogin}
@@ -320,6 +364,57 @@ export default function HeaderNav({
             navigate("/dashboard", { replace: true });
           }}
         />
+      )}
+
+      {/* 프로필 이미지 라이트박스 모달 */}
+      {showProfileLightbox && user?.profileImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          onClick={() => setShowProfileLightbox(false)}
+        >
+          <div 
+            className="relative max-w-[90vw] max-h-[90vh] animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 닫기 버튼 */}
+            <button
+              type="button"
+              onClick={() => setShowProfileLightbox(false)}
+              className="absolute -top-10 right-0 text-white/80 hover:text-white text-sm flex items-center gap-1 transition"
+            >
+              닫기 ✕
+            </button>
+            
+            {/* 프로필 이미지 */}
+            <div className="rounded-2xl overflow-hidden shadow-2xl ring-4 ring-white/20">
+              <img
+                src={user.profileImage}
+                alt={`${user.name || user.email}님의 프로필`}
+                className="max-w-[80vw] max-h-[80vh] object-contain"
+              />
+            </div>
+            
+            {/* 사용자 정보 */}
+            <div className="mt-4 text-center">
+              <p className="text-white font-bold text-lg">
+                {user.name || user.email}
+              </p>
+              {user.name && user.email && (
+                <p className="text-white/60 text-sm mt-1">
+                  {user.email}
+                </p>
+              )}
+              {user.provider === 'kakao' && (
+                <span className="inline-flex items-center gap-1 mt-2 px-3 py-1 rounded-full bg-[#FEE500] text-[#000000] text-xs font-bold">
+                  <svg width="12" height="12" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path fillRule="evenodd" clipRule="evenodd" d="M9 0C4.02944 0 0 3.13401 0 7C0 9.38756 1.55732 11.4691 3.93478 12.6354L2.93217 16.5627C2.84739 16.9069 3.2353 17.1744 3.52577 16.9644L8.14068 13.8679C8.42298 13.8893 8.70959 13.9 9 13.9C13.9706 13.9 18 10.766 18 6.9C18 3.13401 13.9706 0 9 0Z" fill="#000000"/>
+                  </svg>
+                  카카오 계정
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

@@ -655,7 +655,7 @@ const GuildHome: React.FC = () => {
                           <span
                             className={`inline-flex items-center rounded-full px-4 py-1.5 text-base font-black tracking-wide ${
                               isClosed
-                                ? "bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-stone-400 border border-[#6b4e2f]"
+                                ? "bg-gradient-to-b from-[#4a2020] to-[#3a1818] text-red-400 border border-red-600/30"
                                 : "bg-gradient-to-b from-[#2a4a2a] to-[#1a3a1a] text-green-400 border border-green-600/30 shadow-[0_2px_8px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)]"
                             }`}
                           >
@@ -690,7 +690,7 @@ const GuildHome: React.FC = () => {
                               상태{" "}
                               <span
                                 className={`text-lg font-black ${
-                                  isClosed ? "text-stone-400" : "text-green-400"
+                                  isClosed ? "text-red-500" : "text-green-400"
                                 }`}
                               >
                                 {g.status}
@@ -706,7 +706,9 @@ const GuildHome: React.FC = () => {
                               navigate(`/guild/${g.id}`);
                             }}
                             className={`rounded-lg px-5 py-2 text-base font-black tracking-wide transition shadow-sm ${
-                              isClosed || isMyCreatedGuild || isMyCurrentGuild
+                              isClosed
+                                ? "bg-gradient-to-b from-[#4a2020] to-[#3a1818] text-red-400 border border-red-600/30 cursor-default"
+                                : isMyCreatedGuild || isMyCurrentGuild
                                 ? "bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-stone-400 border border-[#6b4e2f] cursor-default"
                                 : "bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)] border border-[#c9a961]/30 hover:from-[#9b7f57] hover:to-[#7b5e3f] active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]"
                             }`}

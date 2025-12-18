@@ -1,5 +1,5 @@
 datasource db {
-  provider = "sqlite"
+  provider = "mysql"
   url      = env("DATABASE_URL")
 }
 
@@ -16,10 +16,17 @@ model User {
   id           Int      @id @default(autoincrement())
   email        String   @unique
   name         String?
-  passwordHash String
+  passwordHash String?  // nullable: 소셜 로그인 사용자는 비밀번호 없음
   role         String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  // ─────────────────────────────────────────────────────────
+  // 소셜 로그인 필드
+  // ─────────────────────────────────────────────────────────
+  provider     String?  // "local", "kakao", "google" 등
+  providerId   String?  // 소셜 로그인 제공자의 사용자 고유 ID
+  profileImage String?  // 소셜 로그인 프로필 이미지 URL
 
   tasteRecords TasteRecord[]
 

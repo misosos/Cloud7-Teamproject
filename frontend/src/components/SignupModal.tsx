@@ -295,23 +295,28 @@ const fallbackAuthenticate = async ({
       className="fixed inset-0 z-50 flex items-center justify-center"
     >
       {/* 어두운 배경(모달 뒤 영역) — 클릭 시 닫힘 */}
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px]" onClick={onBackdropClick} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onBackdropClick} />
 
-      {/* 모달 카드 박스 */}
+      {/* 모달 카드 박스 - 중세 길드 테마 */}
       <div
-        className="relative z-10 w-[90vw] max-w-md rounded-2xl bg-white shadow-2xl border border-stone-200"
+        className="relative z-10 w-[90vw] max-w-md rounded-lg bg-gradient-to-b from-[#6b4e2f] to-[#5a3e25] shadow-[0_8px_32px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)] border-2 border-[#8b6f47] overflow-hidden"
         onClick={(e) => e.stopPropagation()} // 카드 내부 클릭 시 닫힘 방지
       >
+        {/* 금속 장식 테두리 */}
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#c9a961] to-transparent opacity-70" />
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#c9a961] to-transparent opacity-70" />
+
         {/* 헤더 영역: 제목 + 닫기 버튼 */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200">
-          <h3 id="auth-modal-title" className="text-base font-semibold text-stone-900">
-            {title}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[#4a3420] relative">
+          <div className="absolute bottom-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-[#c9a961]/40 to-transparent" />
+          <h3 id="auth-modal-title" className="text-lg font-black text-[#f4d7aa] tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+            ⚔️ {title}
           </h3>
           <button
             type="button"
             aria-label="close"
             onClick={onClose}
-            className="rounded-md p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+            className="rounded-lg p-2 text-[#d4a574] hover:bg-[#4a3420] hover:text-[#f4d7aa] transition-all"
             disabled={loading}
           >
             ✕
@@ -319,17 +324,17 @@ const fallbackAuthenticate = async ({
         </div>
 
         {/* 본문: 입력 폼 */}
-        <form className="px-5 py-4 space-y-3" onSubmit={handleSubmit}>
+        <form className="px-5 py-5 space-y-4" onSubmit={handleSubmit}>
           {/* 에러 메시지 박스 (있는 경우에만 노출) */}
           {error && (
-            <div role="alert" aria-live="polite" className="mb-1 rounded-md bg-red-50 text-red-700 text-xs px-3 py-2 border border-red-200">
-              {error}
+            <div role="alert" aria-live="polite" className="mb-1 rounded-lg bg-red-900/40 text-red-200 text-xs px-3 py-2 border border-red-700/50 font-medium">
+              ⚠️ {error}
             </div>
           )}
 
           {/* 이메일 입력 */}
           <label className="block">
-            <span className="block text-sm text-stone-700 mb-1">이메일</span>
+            <span className="block text-sm text-[#d4a574] mb-1.5 font-bold">📧 이메일</span>
             <input
               id="auth-email"
               ref={emailRef}
@@ -339,14 +344,14 @@ const fallbackAuthenticate = async ({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500"
+              className="w-full rounded-lg border-2 border-[#4a3420] bg-[#3a2818] px-4 py-2.5 text-sm text-[#f4d7aa] placeholder-[#8b6f47] outline-none focus:ring-2 focus:ring-[#c9a961]/50 focus:border-[#8b6f47] transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)]"
               disabled={loading}
             />
           </label>
 
           {/* 비밀번호 입력 + 표시/숨김 토글 + CapsLock 안내 */}
           <label className="block">
-            <span className="block text-sm text-stone-700 mb-1">비밀번호</span>
+            <span className="block text-sm text-[#d4a574] mb-1.5 font-bold">🔑 비밀번호</span>
             <div className="relative">
               <input
                 id="auth-password"
@@ -358,32 +363,32 @@ const fallbackAuthenticate = async ({
                 onKeyUp={(e) => setCapsOn((e as React.KeyboardEvent<HTMLInputElement>).getModifierState?.("CapsLock") || false)}
                 aria-invalid={!isPasswordValid}
                 aria-describedby="password-help"
-                className={`w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500 ${
-                  !isPasswordValid && password.length > 0 ? "border-red-300" : "border-stone-300"
+                className={`w-full rounded-lg border-2 bg-[#3a2818] px-4 py-2.5 text-sm text-[#f4d7aa] placeholder-[#8b6f47] outline-none focus:ring-2 focus:ring-[#c9a961]/50 transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)] ${
+                  !isPasswordValid && password.length > 0 ? "border-red-700/70" : "border-[#4a3420] focus:border-[#8b6f47]"
                 }`}
                 disabled={loading}
               />
               <button
                 type="button"
                 onClick={() => setShowPw((v) => !v)}
-                className="absolute inset-y-0 right-2 my-auto text-xs text-stone-600 hover:text-stone-900"
+                className="absolute inset-y-0 right-3 my-auto text-xs text-[#8b6f47] hover:text-[#d4a574] font-medium transition-colors"
                 tabIndex={-1}
               >
                 {showPw ? "숨김" : "표시"}
               </button>
             </div>
-            <small id="password-help" className="block mt-1 text-xs text-stone-500">
+            <small id="password-help" className="block mt-1.5 text-xs text-[#8b6f47]">
               {isSignup ? "6자 이상, 회원가입 시 비밀번호 확인이 필요합니다." : "6자 이상 입력해 주세요."}
             </small>
             {capsOn && (
-              <div className="mt-1 text-xs text-amber-700">Caps Lock이 켜져 있습니다.</div>
+              <div className="mt-1 text-xs text-[#c9a961] font-medium">⚠️ Caps Lock이 켜져 있습니다.</div>
             )}
           </label>
 
           {/* 회원가입 모드일 때만 비밀번호 확인 입력란 노출 */}
           {isSignup && (
             <label className="block">
-              <span className="block text-sm text-stone-700 mb-1">비밀번호 확인</span>
+              <span className="block text-sm text-[#d4a574] mb-1.5 font-bold">🔐 비밀번호 확인</span>
               <div className="relative">
                 <input
                   id="auth-password-confirm"
@@ -393,15 +398,15 @@ const fallbackAuthenticate = async ({
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                   aria-invalid={!isConfirmValid}
-                  className={`w-full rounded-md border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500 ${
-                    !isConfirmValid && confirm.length > 0 ? "border-red-300" : "border-stone-300"
+                  className={`w-full rounded-lg border-2 bg-[#3a2818] px-4 py-2.5 text-sm text-[#f4d7aa] placeholder-[#8b6f47] outline-none focus:ring-2 focus:ring-[#c9a961]/50 transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)] ${
+                    !isConfirmValid && confirm.length > 0 ? "border-red-700/70" : "border-[#4a3420] focus:border-[#8b6f47]"
                   }`}
                   disabled={loading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPwConfirm((v) => !v)}
-                  className="absolute inset-y-0 right-2 my-auto text-xs text-stone-600 hover:text-stone-900"
+                  className="absolute inset-y-0 right-3 my-auto text-xs text-[#8b6f47] hover:text-[#d4a574] font-medium transition-colors"
                   tabIndex={-1}
                 >
                   {showPwConfirm ? "숨김" : "표시"}
@@ -411,25 +416,61 @@ const fallbackAuthenticate = async ({
           )}
 
           {/* 액션 영역: 로그인 유지(로그인 모드에서만) + 모드 전환 + 제출 */}
-          <div className="pt-2 flex items-center justify-between">
+          <div className="pt-3 flex flex-col gap-4">
             {/* 로그인 모드일 때만 '로그인 유지' 체크박스 표시 */}
-            {(!isSignup) ? (
-              <label className="inline-flex items-center gap-2 text-sm text-stone-700 select-none">
+            {(!isSignup) && (
+              <label className="inline-flex items-center gap-2 text-sm text-[#d4a574] select-none font-medium">
                 <input
                   type="checkbox"
-                  className="rounded border-stone-300"
+                  className="rounded border-[#4a3420] bg-[#3a2818] text-[#c9a961] focus:ring-[#c9a961]/50"
                   checked={remember}
                   onChange={(e) => setRemember(e.target.checked)}
                   disabled={loading}
                 />
                 로그인 유지
               </label>
-            ) : (
-              <span />
             )}
 
-            <div className="flex items-center gap-3">
-              {/* 모드 전환(회원가입 ↔ 로그인) — 클릭 시 문구/필드가 바뀜 */}
+            {/* 제출 버튼 */}
+            <button
+              type="submit"
+              className="w-full py-3 rounded-lg bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white text-sm font-black tracking-wide hover:from-[#9b7f57] hover:to-[#7b5e3f] transition-all shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)] border border-[#c9a961]/30 active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading || !isFormValid}
+            >
+              {loading ? "⏳ 처리 중..." : `⚔️ ${cta}`}
+            </button>
+
+            {/* 구분선 */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-[#4a3420]" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="px-3 bg-gradient-to-b from-[#6b4e2f] to-[#5a3e25] text-[#8b6f47] font-medium">
+                  또는
+                </span>
+              </div>
+            </div>
+
+            {/* 카카오 로그인 버튼 */}
+            <button
+              type="button"
+              onClick={() => {
+                // 카카오 로그인 페이지로 이동
+                window.location.href = '/api/auth/kakao';
+              }}
+              disabled={loading}
+              className="w-full py-3 rounded-lg bg-[#FEE500] text-[#000000] text-sm font-bold tracking-wide hover:bg-[#FDD800] transition-all shadow-[0_4px_12px_rgba(0,0,0,0.3)] active:shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {/* 카카오 로고 SVG */}
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path fillRule="evenodd" clipRule="evenodd" d="M9 0C4.02944 0 0 3.13401 0 7C0 9.38756 1.55732 11.4691 3.93478 12.6354L2.93217 16.5627C2.84739 16.9069 3.2353 17.1744 3.52577 16.9644L8.14068 13.8679C8.42298 13.8893 8.70959 13.9 9 13.9C13.9706 13.9 18 10.766 18 6.9C18 3.13401 13.9706 0 9 0Z" fill="#000000"/>
+              </svg>
+              카카오로 {isSignup ? "시작하기" : "로그인"}
+            </button>
+
+            {/* 모드 전환(회원가입 ↔ 로그인) */}
+            <div className="text-center">
               <button
                 type="button"
                 onClick={() => {
@@ -438,19 +479,10 @@ const fallbackAuthenticate = async ({
                   setError(null);
                   onSwitchMode?.(next);
                 }}
-                className="text-sm text-amber-700 hover:text-amber-800 disabled:opacity-50"
+                className="text-sm text-[#c9a961] hover:text-[#f4d7aa] disabled:opacity-50 font-medium transition-colors"
                 disabled={loading}
               >
                 {isSignup ? "이미 계정이 있으신가요? 로그인" : "아직 회원이 아니신가요? 회원가입"}
-              </button>
-
-              {/* 제출 버튼: 로딩 중/유효성 실패 시 비활성화 */}
-              <button
-                type="submit"
-                className="px-4 py-2 text-sm font-medium rounded-md bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={loading || !isFormValid}
-              >
-                {loading ? "처리 중..." : cta}
               </button>
             </div>
           </div>
