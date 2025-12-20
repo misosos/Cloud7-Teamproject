@@ -1,5 +1,7 @@
 /**********************************************************************************
  * Express 앱 전역 설정 파일 (app.ts)
+ * - ✅ production 세션 MemoryStore 경고 해결: Redis/Valkey 기반 connect-redis 적용
+ * - ✅ HTTP/HTTPS 혼재 환경 대응: env.HTTPS로 secure/sameSite 제어 유지
  **********************************************************************************/
 
 import express, { type Request, type Response, type NextFunction } from "express";
@@ -10,6 +12,10 @@ import session from "express-session";
 import helmet from "helmet";
 import compression from "compression";
 import path from "path";
+
+// ✅ session store
+import { RedisStore } from "connect-redis";
+import { createClient } from "redis";
 
 import routes from "./routes";
 import tasteRecordsRouter from "./routes/tasteRecords.routes";
@@ -50,9 +56,9 @@ app.use(cookieParser());
  * ============================================================================ */
 const isProd = env.NODE_ENV === "production";
 
-// ⚠️ 지금 네 배포는 "production"이더라도 HTTP 환경일 수 있음(학교 포트/도메인)
-//    => 쿠키 secure(true) 쓰면 브라우저가 쿠키를 버려서 로그인 유지가 깨짐
-const isHttps = String(env.HTTPS).toLowerCase() === "true";// (선택) .env에 HTTPS=true 넣으면 https로 간주
+// ⚠️ "production"이어도 HTTP일 수 있음
+// => secure(true)면 브라우저가 쿠키를 버려서 로그인 유지가 깨짐
+const isHttps = String(env.HTTPS).toLowerCase() === "true"; // .env에 HTTPS=true면 https로 간주
 
 const allowedOrigins = (env.CORS_ORIGIN ?? "")
   .split(",")
@@ -72,10 +78,7 @@ const DUCKDNS_HOST = "cloud7-taste.duckdns.org";
 function isDuckdnsOrigin(origin: string): boolean {
   try {
     const u = new URL(origin);
-    return (
-      (u.protocol === "http:" || u.protocol === "https:") &&
-      u.hostname === DUCKDNS_HOST
-    );
+    return (u.protocol === "http:" || u.protocol === "https:") && u.hostname === DUCKDNS_HOST;
   } catch {
     return false;
   }
@@ -117,7 +120,7 @@ const corsOptions: CorsOptions = {
 
 app.use(cors(corsOptions));
 
-// ✅ (중요) 여기서 "*" 쓰면 path-to-regexp 에러남 -> 정규식으로 변경
+// ✅ 여기서 "*" 쓰면 path-to-regexp 에러날 수 있음 -> 정규식
 app.options(/.*/, cors(corsOptions));
 
 /* ==============================================================================
@@ -126,8 +129,17 @@ app.options(/.*/, cors(corsOptions));
 app.set("trust proxy", 1);
 
 /* ==============================================================================
- *  6. session
+ *  6. session (Redis/Valkey store)
  * ============================================================================ */
+// ✅ Valkey/Redis URL (예: redis://127.0.0.1:6379)
+// - 로컬/서버 공통으로 .env에 REDIS_URL 추천
+const REDIS_URL = process.env.REDIS_URL || "redis://127.0.0.1:6379";
+
+const redisClient = createClient({ url: REDIS_URL });
+redisClient.connect().catch((err) => {
+  console.error("[redis] connect error:", err);
+});
+
 app.use(
   session({
     name: "sid",
@@ -137,6 +149,9 @@ app.use(
 
     // proxy 옵션은 secure 쿠키(HTTPS)에서만 의미가 큼
     proxy: isProd,
+
+    // ✅ production MemoryStore 경고 제거
+    store: new RedisStore({ client: redisClient }),
 
     cookie: {
       httpOnly: true,
@@ -203,10 +218,7 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err);
   res.status(500).json({
     ok: false,
-    error:
-      env.NODE_ENV === "development" && err instanceof Error
-        ? err.message
-        : "Internal Server Error",
+    error: env.NODE_ENV === "development" && err instanceof Error ? err.message : "Internal Server Error",
   });
 });
 
