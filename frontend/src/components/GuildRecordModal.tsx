@@ -37,19 +37,20 @@ export default function GuildRecordModal({
   onSaveSuccess,
   onError,
 }: GuildRecordModalProps) {
+  // Theme tokens (Warm Oak)
+ 
+
   const [title, setTitle] = useState("");
   const [desc, setDesc] = useState("");
   const [category, setCategory] = useState("");
-  const [customCategory, setCustomCategory] = useState(""); // Custom category input when "기타" is selected
+  const [customCategory, setCustomCategory] = useState("");
   const [recordDate, setRecordDate] = useState("");
   const [rating, setRating] = useState(0);
   const [content, setContent] = useState("");
-  
-  // 태그 상태: 문자열 배열로 관리, 사용자 입력으로 추가
+
   const [hashtags, setHashtags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
 
-  // 이미지 상태: 메인 이미지와 추가 이미지(최대 5개)
   const [mainImageFile, setMainImageFile] = useState<File | null>(null);
   const [mainImagePreview, setMainImagePreview] = useState<string | null>(null);
   const [extraImageFiles, setExtraImageFiles] = useState<File[]>([]);
@@ -58,7 +59,6 @@ export default function GuildRecordModal({
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // 미리 정의된 해시태그 옵션 (선택 사항으로 유지)
   const predefinedHashtags = [
     "#주말",
     "#친구",
@@ -70,7 +70,6 @@ export default function GuildRecordModal({
     "#클래식",
   ];
 
-  // 카테고리 옵션
   const categoryOptions = [
     "영화",
     "공연",
@@ -82,17 +81,15 @@ export default function GuildRecordModal({
     "기타",
   ];
 
-  // 컴포넌트 언마운트 시 preview URL 정리
+  // 언마운트 시 preview URL 정리
   useEffect(() => {
     return () => {
-      if (mainImagePreview) {
-        URL.revokeObjectURL(mainImagePreview);
-      }
+      if (mainImagePreview) URL.revokeObjectURL(mainImagePreview);
       extraImagePreviews.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [mainImagePreview, extraImagePreviews]);
 
-  // 모달이 닫힐 때 preview URL 정리
+  // 모달 닫힐 때 preview URL 정리
   useEffect(() => {
     if (!open) {
       if (mainImagePreview) {
@@ -102,59 +99,48 @@ export default function GuildRecordModal({
       extraImagePreviews.forEach((url) => URL.revokeObjectURL(url));
       setExtraImagePreviews([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // 추천 장소 달성 기록인 경우 제목 미리 채우기
   useEffect(() => {
-    if (open && kakaoPlaceId && placeName && !title.trim()) {
-      setTitle(placeName);
-    }
-  }, [open, kakaoPlaceId, placeName]);
+    if (open && kakaoPlaceId && placeName && !title.trim()) setTitle(placeName);
+  }, [open, kakaoPlaceId, placeName, title]);
 
   if (!open) return null;
 
-  // 메인 이미지 선택 핸들러
+  // 메인 이미지 선택
   const handleMainImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) {
       setMainImageFile(null);
-      if (mainImagePreview) {
-        URL.revokeObjectURL(mainImagePreview);
-      }
+      if (mainImagePreview) URL.revokeObjectURL(mainImagePreview);
       setMainImagePreview(null);
       return;
     }
 
     const file = files[0];
-    // 기존 preview URL 정리
-    if (mainImagePreview) {
-      URL.revokeObjectURL(mainImagePreview);
-    }
+    if (mainImagePreview) URL.revokeObjectURL(mainImagePreview);
+
     setMainImageFile(file);
     const previewUrl = URL.createObjectURL(file);
     setMainImagePreview(previewUrl);
   };
 
-  // 메인 이미지 삭제 핸들러
   const handleRemoveMainImage = () => {
-    if (mainImagePreview) {
-      URL.revokeObjectURL(mainImagePreview);
-    }
+    if (mainImagePreview) URL.revokeObjectURL(mainImagePreview);
     setMainImageFile(null);
     setMainImagePreview(null);
   };
 
-  // 추가 이미지 선택 핸들러: 최대 5개까지 업로드 가능
-  const handleExtraImagesChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
+  // 추가 이미지: 최대 5개
+  const handleExtraImagesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
-    // 기존 파일과 새 파일 합치기, 최대 5개 제한
     const existingCount = extraImageFiles.length;
     const remainingSlots = 5 - existingCount;
-    
+
     if (remainingSlots <= 0) {
       toast.error("추가 사진은 최대 5개까지 업로드할 수 있습니다.");
       return;
@@ -163,72 +149,52 @@ export default function GuildRecordModal({
     const newFiles = Array.from(files).slice(0, remainingSlots);
     const updatedFiles = [...extraImageFiles, ...newFiles];
     setExtraImageFiles(updatedFiles);
-    
-    // 기존 preview URL 정리 및 새 preview 생성
+
     const newPreviews = newFiles.map((file) => URL.createObjectURL(file));
     setExtraImagePreviews([...extraImagePreviews, ...newPreviews]);
-    
-    // input 초기화 (같은 파일 다시 선택 가능하도록)
+
     event.target.value = "";
   };
 
-  // 추가 이미지 개별 삭제 핸들러
   const handleRemoveExtraImage = (index: number) => {
-    // 기존 preview URL 정리
     URL.revokeObjectURL(extraImagePreviews[index]);
-    
+
     const updatedFiles = extraImageFiles.filter((_, i) => i !== index);
     const updatedPreviews = extraImagePreviews.filter((_, i) => i !== index);
-    
+
     setExtraImageFiles(updatedFiles);
     setExtraImagePreviews(updatedPreviews);
   };
 
-  // 해시태그 추가: Enter 또는 쉼표로 추가, 중복 방지
+  // 태그
   const handleAddTag = (tag: string) => {
-    const trimmedTag = tag.trim();
-    if (!trimmedTag) return;
-    
-    // # 제거 후 추가 (사용자가 #를 입력해도 자동 처리)
-    const cleanTag = trimmedTag.startsWith("#") 
-      ? trimmedTag.slice(1) 
-      : trimmedTag;
-    
-    // 중복 체크
-    if (hashtags.includes(cleanTag)) {
-      return;
-    }
-    
-    setHashtags((prev) => [...prev, cleanTag]);
+    const trimmed = tag.trim();
+    if (!trimmed) return;
+
+    const clean = trimmed.startsWith("#") ? trimmed.slice(1) : trimmed;
+    if (!clean || hashtags.includes(clean)) return;
+
+    setHashtags((prev) => [...prev, clean]);
     setTagInput("");
   };
 
-  // 태그 입력 핸들러: Enter 또는 쉼표로 태그 추가
   const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
-      if (tagInput.trim()) {
-        handleAddTag(tagInput);
-      }
+      if (tagInput.trim()) handleAddTag(tagInput);
     }
   };
 
-  // 태그 개별 삭제
   const handleRemoveTag = (tagToRemove: string) => {
     setHashtags((prev) => prev.filter((tag) => tag !== tagToRemove));
   };
 
-  // 미리 정의된 태그 토글 (기존 기능 유지)
   const togglePredefinedHashtag = (tag: string) => {
-    const cleanTag = tag.startsWith("#") ? tag.slice(1) : tag;
-    setHashtags((prev) =>
-      prev.includes(cleanTag) 
-        ? prev.filter((t) => t !== cleanTag) 
-        : [...prev, cleanTag],
-    );
+    const clean = tag.startsWith("#") ? tag.slice(1) : tag;
+    setHashtags((prev) => (prev.includes(clean) ? prev.filter((t) => t !== clean) : [...prev, clean]));
   };
 
-  // 저장 핸들러
+  // 저장
   const handleSave = async () => {
     if (isSaving) return;
 
@@ -237,13 +203,11 @@ export default function GuildRecordModal({
       return;
     }
 
-    // 추천 장소 기록인 경우 이미지 필수
     if (kakaoPlaceId && !mainImageFile) {
       setErrorMessage("추천 장소 기록은 사진이 필수입니다. 사진을 추가해주세요.");
       return;
     }
 
-    // Custom category validation
     if (category === "기타" && !customCategory.trim()) {
       setErrorMessage("카테고리를 직접 입력해주세요.");
       return;
@@ -268,29 +232,21 @@ export default function GuildRecordModal({
         });
 
         if (!uploadResponse.ok) {
-          let errorMessage = "메인 이미지 업로드에 실패했습니다.";
+          let msg = "메인 이미지 업로드에 실패했습니다.";
           try {
             const errorJson = await uploadResponse.json();
-            errorMessage = errorJson.message || errorJson.error || errorMessage;
-            
-            if (uploadResponse.status === 401) {
-              errorMessage = "로그인이 필요합니다. 페이지를 새로고침해주세요.";
-            }
+            msg = errorJson.message || errorJson.error || msg;
+            if (uploadResponse.status === 401) msg = "로그인이 필요합니다. 페이지를 새로고침해주세요.";
           } catch {
-            if (uploadResponse.status === 401) {
-              errorMessage = "로그인이 필요합니다. 페이지를 새로고침해주세요.";
-            }
+            if (uploadResponse.status === 401) msg = "로그인이 필요합니다. 페이지를 새로고침해주세요.";
           }
-          throw new Error(errorMessage);
+          throw new Error(msg);
         }
 
-        const uploadJson =
-          (await uploadResponse.json()) as UploadImageResponse;
+        const uploadJson = (await uploadResponse.json()) as UploadImageResponse;
         mainImageUrl = uploadJson.url ?? uploadJson.data?.url ?? null;
 
-        if (!uploadJson.ok || !mainImageUrl) {
-          throw new Error("메인 이미지 업로드에 실패했습니다.");
-        }
+        if (!uploadJson.ok || !mainImageUrl) throw new Error("메인 이미지 업로드에 실패했습니다.");
       }
 
       // 추가 이미지 업로드
@@ -305,37 +261,27 @@ export default function GuildRecordModal({
         });
 
         if (!uploadResponse.ok) {
-          // 401 에러인 경우 전체 프로세스 중단
           if (uploadResponse.status === 401) {
             throw new Error("로그인이 필요합니다. 페이지를 새로고침해주세요.");
           }
-          // 그 외 에러는 추가 이미지이므로 계속 진행
           continue;
         }
 
-        const uploadJson =
-          (await uploadResponse.json()) as UploadImageResponse;
+        const uploadJson = (await uploadResponse.json()) as UploadImageResponse;
         const url = uploadJson.url ?? uploadJson.data?.url;
-        if (url) {
-          extraImageUrls.push(url);
-        }
+        if (url) extraImageUrls.push(url);
       }
 
-      // If category is "기타", use customCategory; otherwise use the selected category
       const finalCategory = category === "기타" ? customCategory.trim() : category;
-      
-      // 규칙: missionId가 있으면 반드시 미션 참여 기록 엔드포인트 사용
-      // 이렇게 해야 missionId가 설정되어 개인 도감 기록에서 제외됨
+
       const endpoint = missionId
         ? `/api/guilds/${guildId}/missions/${missionId}/records`
         : `/api/guilds/${guildId}/records`;
-      
+
       const response = await fetch(endpoint, {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
           desc: desc || null,
@@ -346,50 +292,40 @@ export default function GuildRecordModal({
           mainImage: mainImageUrl,
           extraImages: extraImageUrls,
           hashtags,
-          kakaoPlaceId: kakaoPlaceId || null, // 추천 장소 달성 기록인 경우
+          kakaoPlaceId: kakaoPlaceId || null,
         }),
       });
 
       if (!response.ok) {
-        let errorMessage = "저장에 실패했습니다.";
+        let msg = "저장에 실패했습니다.";
         try {
           const errorJson = await response.json();
-          errorMessage = errorJson.message || errorJson.error || errorMessage;
-          
-          // 특정 에러 코드에 대한 메시지 처리
-          if (errorJson.error === "MISSION_FULL" || errorMessage.includes("끝난 미션")) {
-            errorMessage = "아쉽지만 이미 끝난 미션입니다.";
-          } else if (errorJson.error === "ALREADY_PARTICIPATED" || errorMessage.includes("이미 참여")) {
-            errorMessage = "이미 참여한 미션입니다.";
-          } else if (errorJson.error === "BAD_REQUEST") {
-            errorMessage = errorJson.message || errorMessage;
-          }
+          msg = errorJson.message || errorJson.error || msg;
+
+          if (errorJson.error === "MISSION_FULL" || msg.includes("끝난 미션")) msg = "아쉽지만 이미 끝난 미션입니다.";
+          else if (errorJson.error === "ALREADY_PARTICIPATED" || msg.includes("이미 참여")) msg = "이미 참여한 미션입니다.";
+          else if (errorJson.error === "BAD_REQUEST") msg = errorJson.message || msg;
         } catch {
-          // JSON 파싱 실패 시 기본 메시지 사용
-          errorMessage = "저장에 실패했습니다. 잠시 후 다시 시도해주세요.";
+          msg = "저장에 실패했습니다. 잠시 후 다시 시도해주세요.";
         }
-        throw new Error(errorMessage);
+        throw new Error(msg);
       }
 
       const json = (await response.json()) as CreateGuildRecordResponse;
 
       if (!json.ok || !json.data) {
-        let errorMessage = json.message || json.error || "저장에 실패했습니다.";
-        
-        // 특정 에러 코드에 대한 메시지 처리
-        if (json.error === "MISSION_FULL" || errorMessage.includes("끝난 미션")) {
-          errorMessage = "아쉽지만 이미 끝난 미션입니다.";
-        } else if (json.error === "ALREADY_PARTICIPATED" || errorMessage.includes("이미 참여")) {
-          errorMessage = "이미 참여한 미션입니다.";
-        } else if (json.error === "BAD_REQUEST") {
-          errorMessage = json.message || errorMessage;
-          // 5분 미달 에러 메시지 처리
-          if (errorMessage.includes("5분 이상 머물러야") || errorMessage.includes("10분 이상 머물러야")) {
-            errorMessage = "해당 장소에서 최소 5분 이상 머물러야 기록을 작성할 수 있습니다.";
+        let msg = json.message || json.error || "저장에 실패했습니다.";
+
+        if (json.error === "MISSION_FULL" || msg.includes("끝난 미션")) msg = "아쉽지만 이미 끝난 미션입니다.";
+        else if (json.error === "ALREADY_PARTICIPATED" || msg.includes("이미 참여")) msg = "이미 참여한 미션입니다.";
+        else if (json.error === "BAD_REQUEST") {
+          msg = json.message || msg;
+          if (msg.includes("5분 이상 머물러야") || msg.includes("10분 이상 머물러야")) {
+            msg = "해당 장소에서 최소 5분 이상 머물러야 기록을 작성할 수 있습니다.";
           }
         }
-        
-        throw new Error(errorMessage);
+
+        throw new Error(msg);
       }
 
       // 입력값 초기화
@@ -400,12 +336,10 @@ export default function GuildRecordModal({
       setRecordDate("");
       setRating(0);
       setContent("");
-      // 기존 preview URL 정리
-      if (mainImagePreview) {
-        URL.revokeObjectURL(mainImagePreview);
-      }
+
+      if (mainImagePreview) URL.revokeObjectURL(mainImagePreview);
       extraImagePreviews.forEach((url) => URL.revokeObjectURL(url));
-      
+
       setHashtags([]);
       setTagInput("");
       setMainImageFile(null);
@@ -413,28 +347,17 @@ export default function GuildRecordModal({
       setExtraImageFiles([]);
       setExtraImagePreviews([]);
 
-      // 생성된 기록 ID 전달
       const createdRecordId = json.data?.id;
-      
-      if (onSaveSuccess) {
-        onSaveSuccess(createdRecordId);
-      }
-
+      onSaveSuccess?.(createdRecordId);
       onClose();
     } catch (error: any) {
       console.error("도감 기록 저장 실패", error);
-      const errorMsg = error?.message || "기록 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
-      setErrorMessage(errorMsg);
-      
-      // 미션 마감 에러인 경우 toast 표시
-      if (errorMsg.includes("끝난 미션")) {
-        toast.error("아쉽지만 이미 끝난 미션입니다.");
-      }
-      
-      // 에러 콜백 호출
-      if (onError) {
-        onError(errorMsg);
-      }
+      const msg =
+        error?.message || "기록 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
+      setErrorMessage(msg);
+
+      if (msg.includes("끝난 미션")) toast.error("아쉽지만 이미 끝난 미션입니다.");
+      onError?.(msg);
     } finally {
       setIsSaving(false);
     }
@@ -442,104 +365,149 @@ export default function GuildRecordModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(88,58,21,0.7)] backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(247,240,230,0.70)] backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-4xl max-h-[90vh] overflow-y-auto m-4 rounded-lg bg-gradient-to-b from-[#5a3e25] to-[#4a3420] border-2 border-[#6b4e2f] shadow-[0_20px_60px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.1)] relative"
+        className="w-full max-w-4xl max-h-[90vh] overflow-y-auto m-4 rounded-2xl
+          bg-[rgba(255,255,255,0.55)] backdrop-blur-md
+          border border-[#C9A961]/45
+          shadow-[0_24px_70px_rgba(43,29,18,0.22)]
+          relative"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 금속 장식 테두리 */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#c9a961] to-transparent opacity-70" />
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#c9a961] to-transparent opacity-70" />
+        {/* 골드 포인트 라인 */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-[#C9A961]/70 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-transparent via-[#C9A961]/70 to-transparent" />
 
-        {/* 헤더 */}
-        <div className="flex items-center justify-between px-6 py-5 border-b-2 border-[#6b4e2f]">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[#C9A961]/25">
           <div className="flex items-center gap-2">
-            <span className="text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-              {missionId ? "⚔️" : "📜"}
-            </span>
-            <h2 className="text-xl sm:text-2xl font-black text-[#f4d7aa] tracking-wide">
+            <i
+              className={`fas ${missionId ? "fa-shield-halved" : "fa-scroll"} text-lg text-[#C9A961]`}
+              aria-hidden="true"
+            />
+            <h2 className="text-xl sm:text-2xl font-black text-[#4A3420] tracking-tight">
               {missionId ? "미션 후기 작성" : "연맹 도감 추가"}
             </h2>
           </div>
+
           <button
             type="button"
             onClick={onClose}
-            className="relative z-50 text-[#d4a574] hover:text-[#f4d7aa] hover:bg-[#6b4e2f]/60 rounded-full w-9 h-9 flex items-center justify-center transition text-lg font-black cursor-pointer active:scale-95 border border-[#6b4e2f]"
+            aria-label="닫기"
+            className="relative z-50 w-9 h-9 rounded-full
+              border border-[#C9A961]/40
+              text-[#6B4E2F]
+              hover:text-[#2B1D12]
+              hover:bg-[rgba(201,169,97,0.14)]
+              active:scale-95 transition flex items-center justify-center"
           >
-            ×
+            <i className="fas fa-times" aria-hidden="true" />
           </button>
         </div>
 
-        {/* 폼 내용 */}
-        <div className="p-6 sm:p-7 space-y-6 text-[15px]">
-          {/* 메인 이미지와 기본 정보 */}
+        {/* Body */}
+        <div className="p-6 sm:p-7 space-y-6 text-[15px] text-[#2B1D12]">
+          {/* Main image + basics */}
           <div className="flex flex-col md:flex-row gap-6">
-            {/* 메인 이미지 업로드: 썸네일 미리보기 및 삭제 버튼 */}
+            {/* Main image */}
             <div className="w-full md:w-64 h-52 md:h-64 flex-shrink-0">
               {mainImagePreview ? (
-                <div className="relative w-full h-full rounded-lg overflow-hidden border-2 border-[#6b4e2f] shadow-[0_8px_24px_rgba(0,0,0,0.5)] group bg-[#3a2818]">
+                <div
+                  className="relative w-full h-full rounded-2xl overflow-hidden
+                    border border-[#C9A961]/30
+                    shadow-[0_18px_44px_rgba(43,29,18,0.18)]
+                    group bg-white/40"
+                >
                   <img
                     src={mainImagePreview}
                     alt="메인 이미지 미리보기"
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                   />
-                  {/* 삭제 버튼 - 추천 장소 기록인 경우 삭제 불가 */}
                   {!kakaoPlaceId && (
                     <button
                       type="button"
                       onClick={handleRemoveMainImage}
-                      className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 text-sm font-bold shadow-lg"
+                      className="absolute top-2 right-2 w-8 h-8
+                        rounded-full flex items-center justify-center
+                        bg-[rgba(180,35,24,0.12)]
+                        text-[#B42318]
+                        border border-[#B42318]/35
+                        opacity-0 group-hover:opacity-100 transition
+                        hover:bg-[rgba(180,35,24,0.18)]"
                       title="삭제"
+                      aria-label="메인 이미지 삭제"
                     >
-                      ×
+                      <i className="fas fa-trash" aria-hidden="true" />
                     </button>
                   )}
                 </div>
               ) : (
-                <label className={`w-full h-full flex items-center justify-center border-2 border-dashed rounded-lg cursor-pointer hover:border-[#c9a961] bg-gradient-to-b from-[#4a3420] to-[#3a2818] transition-colors shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)] ${
-                  kakaoPlaceId ? "border-red-500 border-2" : "border-[#6b4e2f]"
-                }`}>
+                <label
+                  className={`w-full h-full flex items-center justify-center rounded-2xl cursor-pointer
+                    bg-[rgba(255,255,255,0.55)]
+                    border border-dashed
+                    shadow-[0_12px_28px_rgba(43,29,18,0.10)]
+                    transition
+                    ${
+                      kakaoPlaceId
+                        ? "border-[#B42318]/55 hover:border-[#B42318]/70"
+                        : "border-[#C9A961]/35 hover:border-[#C9A961]/60"
+                    }`}
+                >
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleMainImageChange}
                     className="hidden"
-                    required={!!kakaoPlaceId} // 추천 장소 기록인 경우 필수
+                    required={!!kakaoPlaceId}
                   />
-                  <div className="text-center text-[#d4a574]">
-                    <div className="text-3xl mb-1">📷</div>
-                    <div className="text-sm font-bold">
+                  <div className="text-center">
+                    <div className="mb-2">
+                      <i className="fas fa-camera text-2xl text-[#C9A961]" aria-hidden="true" />
+                    </div>
+                    <div className="text-sm font-black text-[#4A3420]">
                       {kakaoPlaceId ? "표지 이미지 추가 (필수)" : "표지 이미지 추가"}
                     </div>
                     {kakaoPlaceId && (
-                      <div className="text-xs text-red-400 mt-1">추천 장소 기록은 사진이 필수입니다</div>
+                      <div className="text-xs mt-1 text-[#B42318] font-semibold">
+                        추천 장소 기록은 사진이 필수입니다
+                      </div>
                     )}
+                    <div className="text-xs mt-2 text-[#6B4E2F]">
+                      클릭해서 사진 업로드
+                    </div>
                   </div>
                 </label>
               )}
             </div>
 
-            {/* 제목과 설명 */}
+            {/* Title/Desc */}
             <div className="flex-1 space-y-4">
               <div>
-                <label className="block text-base font-black text-[#f4d7aa] mb-1 tracking-wide">
-                  도감 제목<span className="text-red-400 ml-1">*</span>
+                <label className="block text-base font-black text-[#4A3420] mb-1 tracking-tight">
+                  도감 제목 <span className="text-[#B42318]">*</span>
                 </label>
                 <input
                   type="text"
                   placeholder="도감 제목"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  readOnly={!!kakaoPlaceId} // 추천 장소 기록인 경우 수정 불가
-                  className={`w-full border-2 border-[#6b4e2f] rounded-lg px-3 py-2.5 text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] placeholder:text-[#8b6f47] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)] ${
-                    kakaoPlaceId ? "opacity-75 cursor-not-allowed" : ""
-                  }`}
+                  readOnly={!!kakaoPlaceId}
+                  className={`w-full rounded-2xl px-3 py-2.5 text-base
+                    bg-[rgba(255,255,255,0.55)]
+                    text-[#2B1D12]
+                    placeholder:text-[#6B4E2F]/70
+                    border border-[#C9A961]/35
+                    focus:outline-none focus:ring-2 focus:ring-[#C9A961]/55 focus:border-[#C9A961]/55
+                    shadow-[0_10px_24px_rgba(43,29,18,0.10)]
+                    ${kakaoPlaceId ? "opacity-75 cursor-not-allowed" : ""}`}
                 />
               </div>
+
               <div>
-                <label className="block text-base font-black text-[#f4d7aa] mb-1 tracking-wide">
+                <label className="block text-base font-black text-[#4A3420] mb-1 tracking-tight">
                   도감 세부 정리
                 </label>
                 <input
@@ -547,42 +515,57 @@ export default function GuildRecordModal({
                   placeholder="도감 세부 정리"
                   value={desc}
                   onChange={(e) => setDesc(e.target.value)}
-                  className="w-full border-2 border-[#6b4e2f] rounded-lg px-3 py-2.5 text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] placeholder:text-[#8b6f47] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]"
+                  className="w-full rounded-2xl px-3 py-2.5 text-base
+                    bg-[rgba(255,255,255,0.55)]
+                    text-[#2B1D12]
+                    placeholder:text-[#6B4E2F]/70
+                    border border-[#C9A961]/35
+                    focus:outline-none focus:ring-2 focus:ring-[#C9A961]/55 focus:border-[#C9A961]/55
+                    shadow-[0_10px_24px_rgba(43,29,18,0.10)]"
                 />
               </div>
             </div>
           </div>
 
-          {/* 카테고리와 날짜 */}
+          {/* Category + Date */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-base font-black text-[#f4d7aa] mb-1 tracking-wide">
+              <label className="block text-base font-black text-[#4A3420] mb-1 tracking-tight">
                 도감 카테고리
               </label>
-              <select
-                value={category}
-                onChange={(e) => {
-                  setCategory(e.target.value);
-                  // Reset custom category when switching away from "기타"
-                  if (e.target.value !== "기타") {
-                    setCustomCategory("");
-                  }
-                }}
-                className="w-full border-2 border-[#6b4e2f] rounded-lg px-3 py-2.5 text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] placeholder:text-[#8b6f47] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]"
-              >
-                <option value="">선택하세요</option>
-                {categoryOptions.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
-              
-              {/* Custom category input - shown only when "기타" is selected */}
+
+              <div className="relative">
+                <select
+                  value={category}
+                  onChange={(e) => {
+                    setCategory(e.target.value);
+                    if (e.target.value !== "기타") setCustomCategory("");
+                  }}
+                  className="w-full rounded-2xl px-3 py-2.5 text-base
+                    bg-[rgba(255,255,255,0.55)]
+                    text-[#2B1D12]
+                    border border-[#C9A961]/35
+                    focus:outline-none focus:ring-2 focus:ring-[#C9A961]/55 focus:border-[#C9A961]/55
+                    shadow-[0_10px_24px_rgba(43,29,18,0.10)]
+                    appearance-none pr-10"
+                >
+                  <option value="">선택하세요</option>
+                  {categoryOptions.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+                <i
+                  className="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-[#6B4E2F]"
+                  aria-hidden="true"
+                />
+              </div>
+
               {category === "기타" && (
                 <div className="mt-2">
-                  <label className="block text-sm font-black text-[#d4a574] mb-1">
-                    직접 입력 <span className="text-red-500">*</span>
+                  <label className="block text-sm font-black text-[#6B4E2F] mb-1">
+                    직접 입력 <span className="text-[#B42318]">*</span>
                   </label>
                   <input
                     type="text"
@@ -590,94 +573,141 @@ export default function GuildRecordModal({
                     value={customCategory}
                     onChange={(e) => {
                       setCustomCategory(e.target.value);
-                      // Clear error when user starts typing
-                      if (errorMessage && e.target.value.trim()) {
-                        setErrorMessage(null);
-                      }
+                      if (errorMessage && e.target.value.trim()) setErrorMessage(null);
                     }}
-                    className="w-full border-2 border-[#6b4e2f] rounded-lg px-3 py-2 text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] placeholder:text-[#8b6f47] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]"
+                    className="w-full rounded-2xl px-3 py-2 text-base
+                      bg-[rgba(255,255,255,0.55)]
+                      text-[#2B1D12]
+                      placeholder:text-[#6B4E2F]/70
+                      border border-[#C9A961]/35
+                      focus:outline-none focus:ring-2 focus:ring-[#C9A961]/55 focus:border-[#C9A961]/55
+                      shadow-[0_10px_24px_rgba(43,29,18,0.10)]"
                   />
                 </div>
               )}
             </div>
+
             <div>
-              <label className="block text-base font-black text-[#f4d7aa] mb-1 tracking-wide">
+              <label className="block text-base font-black text-[#4A3420] mb-1 tracking-tight">
                 날짜
               </label>
-              <div className="flex gap-2">
-                <input
-                  type="date"
-                  value={recordDate}
-                  onChange={(e) => setRecordDate(e.target.value)}
-                  className="flex-1 border-2 border-[#6b4e2f] rounded-lg px-3 py-2.5 text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]"
-                />
-                <span className="text-2xl flex items-center justify-center text-[#d4a574]">
-                  📅
+
+              <div className="flex gap-2 items-center">
+                <div className="relative flex-1">
+                  <input
+                    type="date"
+                    value={recordDate}
+                    onChange={(e) => setRecordDate(e.target.value)}
+                    className="w-full rounded-2xl px-3 py-2.5 text-base
+                      bg-[rgba(255,255,255,0.55)]
+                      text-[#2B1D12]
+                      border border-[#C9A961]/35
+                      focus:outline-none focus:ring-2 focus:ring-[#C9A961]/55 focus:border-[#C9A961]/55
+                      shadow-[0_10px_24px_rgba(43,29,18,0.10)]"
+                  />
+                </div>
+
+                <span
+                  className="w-10 h-10 rounded-2xl flex items-center justify-center
+                    bg-[rgba(201,169,97,0.14)]
+                    border border-[#C9A961]/30
+                    text-[#4A3420]"
+                  aria-hidden="true"
+                >
+                  <i className="fas fa-calendar-day" />
                 </span>
               </div>
             </div>
           </div>
 
-          {/* 별점 */}
+          {/* Rating */}
           <div>
-            <label className="block text-base font-black text-[#f4d7aa] mb-2 tracking-wide">
+            <label className="block text-base font-black text-[#4A3420] mb-2 tracking-tight">
               별점
             </label>
+
             <div className="flex items-center gap-2">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  type="button"
-                  onClick={() => setRating(star)}
-                  className="text-2xl"
-                >
-                  {star <= rating ? "⭐" : "☆"}
-                </button>
-              ))}
+              {[1, 2, 3, 4, 5].map((star) => {
+                const active = star <= rating;
+                return (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setRating(star)}
+                    className={`w-11 h-11 rounded-2xl flex items-center justify-center transition
+                      border
+                      ${
+                        active
+                          ? "bg-[rgba(201,169,97,0.16)] border-[#C9A961]/50"
+                          : "bg-[rgba(255,255,255,0.55)] border-[#C9A961]/25 hover:bg-[rgba(201,169,97,0.12)]"
+                      }`}
+                    aria-label={`${star}점`}
+                  >
+                    <i
+                      className={`fas fa-star text-lg ${active ? "text-[#C9A961]" : "text-[#6B4E2F]/60"}`}
+                      aria-hidden="true"
+                    />
+                  </button>
+                );
+              })}
+
               {rating > 0 && (
-                <span className="ml-2 text-sm text-[#d4a574] font-bold">
-                  {rating}점
-                </span>
+                <span className="ml-2 text-sm text-[#6B4E2F] font-bold">{rating}점</span>
               )}
             </div>
           </div>
 
-          {/* 추가 사진: 최대 5개까지 업로드 가능, 썸네일 미리보기 및 개별 삭제 */}
+          {/* Extra images */}
           <div>
-            <label className="block text-base font-black text-[#f4d7aa] mb-2 tracking-wide">
+            <label className="block text-base font-black text-[#4A3420] mb-2 tracking-tight">
               추가 사진 {extraImageFiles.length > 0 && `(${extraImageFiles.length}/5)`}
             </label>
+
             <div className="space-y-3">
-              {/* 업로드된 이미지 썸네일 그리드 */}
               {extraImageFiles.length > 0 && (
-                <div className="grid grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                   {extraImageFiles.map((file, index) => (
                     <div
                       key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
-                      className="relative w-full aspect-square rounded-lg overflow-hidden border-2 border-[#6b4e2f] shadow-[0_4px_16px_rgba(0,0,0,0.5)] group bg-[#3a2818]"
+                      className="relative w-full aspect-square rounded-2xl overflow-hidden
+                        border border-[#C9A961]/28
+                        shadow-[0_14px_32px_rgba(43,29,18,0.12)]
+                        group bg-white/40"
                     >
                       <img
                         src={extraImagePreviews[index]}
                         alt={`추가 이미지 ${index + 1}`}
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                       />
-                      {/* 삭제 버튼 */}
                       <button
                         type="button"
                         onClick={() => handleRemoveExtraImage(index)}
-                        className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 text-xs font-bold shadow-lg"
+                        className="absolute top-2 right-2 w-8 h-8 rounded-full
+                          flex items-center justify-center
+                          bg-[rgba(180,35,24,0.12)]
+                          text-[#B42318]
+                          border border-[#B42318]/35
+                          opacity-0 group-hover:opacity-100 transition
+                          hover:bg-[rgba(180,35,24,0.18)]"
                         title="삭제"
+                        aria-label="추가 이미지 삭제"
                       >
-                        ×
+                        <i className="fas fa-trash" aria-hidden="true" />
                       </button>
                     </div>
                   ))}
                 </div>
               )}
-              
-              {/* 이미지 추가 버튼 (5개 미만일 때만 표시) */}
+
               {extraImageFiles.length < 5 && (
-                <label className="inline-flex items-center justify-center w-32 h-32 border-2 border-dashed border-[#6b4e2f] rounded-lg cursor-pointer hover:border-[#c9a961] bg-gradient-to-b from-[#4a3420] to-[#3a2818] transition-colors shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]">
+                <label
+                  className="inline-flex items-center justify-center w-32 h-32 rounded-2xl cursor-pointer
+                    bg-[rgba(255,255,255,0.55)]
+                    border border-dashed border-[#C9A961]/35
+                    hover:border-[#C9A961]/60
+                    shadow-[0_12px_28px_rgba(43,29,18,0.10)]
+                    transition"
+                >
                   <input
                     type="file"
                     accept="image/*"
@@ -686,40 +716,44 @@ export default function GuildRecordModal({
                     multiple
                   />
                   <div className="text-center">
-                    <div className="text-2xl mb-1 text-[#d4a574]">🖼️</div>
-                    <div className="text-xs text-[#d4a574] font-bold">추가</div>
+                    <i className="fas fa-images text-2xl text-[#C9A961]" aria-hidden="true" />
+                    <div className="text-xs mt-2 text-[#6B4E2F] font-bold">추가</div>
                   </div>
                 </label>
               )}
-              
+
               {extraImageFiles.length >= 5 && (
-                <p className="text-xs text-[#8b6f47]">
-                  최대 5개까지 업로드할 수 있습니다.
-                </p>
+                <p className="text-xs text-[#6B4E2F]">최대 5개까지 업로드할 수 있습니다.</p>
               )}
             </div>
           </div>
 
-          {/* 도감 내용 */}
+          {/* Content */}
           <div>
-            <label className="block text-base font-black text-[#f4d7aa] mb-2 tracking-wide">
+            <label className="block text-base font-black text-[#4A3420] mb-2 tracking-tight">
               도감 내용
             </label>
             <textarea
               placeholder="도감 후기를 작성해주세요"
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              className="w-full border-2 border-[#6b4e2f] rounded-lg px-3 py-2.5 h-32 text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] placeholder:text-[#8b6f47] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]"
+              className="w-full rounded-2xl px-3 py-2.5 h-32 text-base
+                bg-[rgba(255,255,255,0.55)]
+                text-[#2B1D12]
+                placeholder:text-[#6B4E2F]/70
+                border border-[#C9A961]/35
+                focus:outline-none focus:ring-2 focus:ring-[#C9A961]/55 focus:border-[#C9A961]/55
+                shadow-[0_10px_24px_rgba(43,29,18,0.10)]"
             />
           </div>
 
-          {/* 해시태그: 사용자 입력으로 추가, pill 형태로 표시, 개별 삭제 가능 */}
+          {/* Hashtags */}
           <div>
-            <label className="block text-base font-black text-[#f4d7aa] mb-2 tracking-wide">
+            <label className="block text-base font-black text-[#4A3420] mb-2 tracking-tight">
               해시 태그
             </label>
+
             <div className="space-y-3">
-              {/* 태그 입력 필드: Enter 또는 쉼표로 추가 */}
               <div className="flex gap-2">
                 <input
                   type="text"
@@ -727,57 +761,79 @@ export default function GuildRecordModal({
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
                   onKeyDown={handleTagInputKeyDown}
-                  className="flex-1 border-2 border-[#6b4e2f] rounded-lg px-3 py-2.5 text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] placeholder:text-[#8b6f47] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]"
+                  className="flex-1 rounded-2xl px-3 py-2.5 text-base
+                    bg-[rgba(255,255,255,0.55)]
+                    text-[#2B1D12]
+                    placeholder:text-[#6B4E2F]/70
+                    border border-[#C9A961]/35
+                    focus:outline-none focus:ring-2 focus:ring-[#C9A961]/55 focus:border-[#C9A961]/55
+                    shadow-[0_10px_24px_rgba(43,29,18,0.10)]"
                 />
                 <button
                   type="button"
                   onClick={() => handleAddTag(tagInput)}
                   disabled={!tagInput.trim()}
-                  className="px-4 py-2.5 rounded-lg bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-sm font-black text-white tracking-wide shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)] border border-[#c9a961]/30 hover:from-[#9b7f57] hover:to-[#7b5e3f] active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl
+                    bg-gradient-to-b from-[#8B6F47] to-[#4A3420]
+                    text-sm font-black text-white tracking-tight
+                    shadow-[0_14px_30px_rgba(43,29,18,0.20),inset_0_1px_0_rgba(255,255,255,0.22)]
+                    border border-[#C9A961]/20
+                    hover:from-[#9a7d52] hover:to-[#5a3f28]
+                    disabled:opacity-50 disabled:cursor-not-allowed transition"
                 >
+                  <i className="fas fa-plus" aria-hidden="true" />
                   추가
                 </button>
               </div>
-              
-              {/* 추가된 태그 pill 목록 */}
+
               {hashtags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {hashtags.map((tag) => (
                     <span
                       key={tag}
-                      className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-b from-[#4a3420] to-[#3a2818] border border-[#6b4e2f] px-3.5 py-1.5 text-sm font-bold text-[#d4a574] shadow-[inset_0_1px_2px_rgba(0,0,0,0.3)]"
+                      className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-bold
+                        bg-[rgba(255,255,255,0.55)]
+                        text-[#4A3420]
+                        border border-[#C9A961]/28"
                     >
-                      #{tag}
+                      <i className="fas fa-hashtag text-[#C9A961]" aria-hidden="true" />
+                      {tag}
                       <button
                         type="button"
                         onClick={() => handleRemoveTag(tag)}
-                        className="text-[12px] text-[#8b6f47] hover:text-[#d4a574] hover:bg-[#6b4e2f]/50 rounded-full w-4.5 h-4.5 flex items-center justify-center transition"
+                        className="w-6 h-6 rounded-full flex items-center justify-center
+                          text-[#6B4E2F]
+                          hover:text-[#2B1D12]
+                          hover:bg-[rgba(201,169,97,0.14)]
+                          transition"
                         title="삭제"
+                        aria-label="태그 삭제"
                       >
-                        ×
+                        <i className="fas fa-times" aria-hidden="true" />
                       </button>
                     </span>
                   ))}
                 </div>
               )}
-              
-              {/* 미리 정의된 태그 (선택 사항) */}
-              <div className="pt-2 border-t border-stone-200">
-                <p className="text-xs text-[#8b6f47] mb-2">추천 태그</p>
+
+              <div className="pt-3 border-t border-[#C9A961]/20">
+                <p className="text-xs text-[#6B4E2F] mb-2">추천 태그</p>
                 <div className="flex flex-wrap gap-2">
                   {predefinedHashtags.map((tag) => {
-                    const cleanTag = tag.startsWith("#") ? tag.slice(1) : tag;
-                    const isSelected = hashtags.includes(cleanTag);
+                    const clean = tag.startsWith("#") ? tag.slice(1) : tag;
+                    const isSelected = hashtags.includes(clean);
                     return (
                       <button
                         key={tag}
                         type="button"
                         onClick={() => togglePredefinedHashtag(tag)}
-                        className={`px-3.5 py-1.5 rounded-full text-sm font-bold transition-colors ${
-                          isSelected
-                            ? "bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white shadow-[0_2px_8px_rgba(0,0,0,0.5)] border border-[#c9a961]/30"
-                            : "bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] border border-[#6b4e2f] hover:from-[#5a4430] hover:to-[#4a3828] shadow-[inset_0_1px_2px_rgba(0,0,0,0.3)]"
-                        }`}
+                        className={`px-3.5 py-1.5 rounded-full text-sm font-bold transition
+                          border
+                          ${
+                            isSelected
+                              ? "bg-[rgba(201,169,97,0.18)] text-[#2B1D12] border-[#C9A961]/55"
+                              : "bg-[rgba(255,255,255,0.55)] text-[#6B4E2F] border-[#C9A961]/25 hover:bg-[rgba(201,169,97,0.12)]"
+                          }`}
                       >
                         {tag}
                       </button>
@@ -788,32 +844,70 @@ export default function GuildRecordModal({
             </div>
           </div>
 
-          {/* 에러 메시지 */}
+          {/* Error */}
           {errorMessage && (
-            <p className="text-sm text-red-400 font-bold">{errorMessage}</p>
+            <div
+              className="rounded-2xl px-4 py-3
+                bg-[rgba(180,35,24,0.08)]
+                border border-[#B42318]/25"
+            >
+              <p className="text-sm text-[#B42318] font-bold flex items-center gap-2">
+                <i className="fas fa-triangle-exclamation" aria-hidden="true" />
+                {errorMessage}
+              </p>
+            </div>
           )}
 
-          {/* 액션 버튼 */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-[#6b4e2f]">
+          {/* Actions */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-[#C9A961]/25">
             <button
               type="button"
               onClick={onClose}
-              className="px-7 py-2.5 rounded-lg bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] text-base font-black tracking-wide shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)] border-2 border-[#6b4e2f] hover:from-[#5a4430] hover:to-[#4a3828] active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] transition"
+              className="inline-flex items-center gap-2 px-7 py-2.5 rounded-2xl
+                bg-[rgba(255,255,255,0.55)]
+                text-[#6B4E2F]
+                font-black tracking-tight
+                border border-[#C9A961]/30
+                hover:bg-[rgba(201,169,97,0.14)]
+                transition"
             >
+              <i className="fas fa-xmark" aria-hidden="true" />
               취소
             </button>
+
             <button
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="px-7 py-2.5 rounded-lg bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white text-base font-black tracking-wide shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)] border border-[#c9a961]/30 hover:from-[#9b7f57] hover:to-[#7b5e3f] active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] transition disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-7 py-2.5 rounded-2xl
+                bg-gradient-to-b from-[#8B6F47] to-[#4A3420]
+                text-white font-black tracking-tight
+                shadow-[0_14px_30px_rgba(43,29,18,0.20),inset_0_1px_0_rgba(255,255,255,0.22)]
+                border border-[#C9A961]/20
+                hover:from-[#9a7d52] hover:to-[#5a3f28]
+                disabled:opacity-60 disabled:cursor-not-allowed transition"
             >
-              {isSaving ? "등록 중..." : "등록"}
+              {isSaving ? (
+                <>
+                  <i className="fas fa-spinner fa-spin" aria-hidden="true" />
+                  등록 중...
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-floppy-disk" aria-hidden="true" />
+                  등록
+                </>
+              )}
             </button>
+          </div>
+
+          {/* subtle footer note (optional) */}
+          <div className="pt-2 text-xs text-[#6B4E2F] flex items-center gap-2">
+            <i className="fab fa-pagelines text-[#C9A961]" aria-hidden="true" />
+            Warm Oak · surface UI
           </div>
         </div>
       </div>
     </div>
   );
 }
-

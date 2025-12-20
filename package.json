@@ -1,5 +1,8 @@
 {
   "name": "cloud-teamproject",
   "private": true,
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "dependencies": {
+    "framer-motion": "^12.23.26"
+  }
 }

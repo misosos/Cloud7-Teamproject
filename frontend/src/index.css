@@ -1,3 +1,39 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@keyframes fadeDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.bg-warm-oak-stripe {
+  position: relative; /* ✅ ::after가 먹게 */
+  background-color: #F7F0E6;
+
+  background-image:
+    /* 골드 포인트 라디얼 (조금 연하게) */
+    radial-gradient(circle at 30% 20%, rgba(201,169,97,0.18), transparent 55%),
+    /* 우드 포인트 라디얼 (조금 연하게) */
+    radial-gradient(circle at 70% 80%, rgba(107,78,47,0.14), transparent 55%),
+    /* ✅ 세로 줄무늬 (Dashboard처럼 더 연하게) */
+    repeating-linear-gradient(
+      90deg,
+      rgba(107,78,47,0.04) 0px,
+      rgba(107,78,47,0.04) 18px,
+      rgba(255,255,255,0.015) 18px,
+      rgba(255,255,255,0.015) 36px
+    );
+
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.bg-warm-oak-stripe::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* ✅ inset shadow도 살짝만 */
+  box-shadow: inset 0 0 140px rgba(0,0,0,0.08);
+}

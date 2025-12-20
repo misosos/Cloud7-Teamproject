@@ -29,13 +29,25 @@ export default function GuildMissionModal({
   guildId,
   onSaveSuccess,
 }: GuildMissionModalProps) {
+  // Warm Oak tokens
+  const THEME = {
+    bg: "#F7F0E6",
+    surface: "rgba(255,255,255,0.55)",
+    text: "#2B1D12",
+    muted: "#6B4E2F",
+    brand: "#C9A961",
+    brand2: "#8B6F47",
+    brand3: "#4A3420",
+    danger: "#B42318",
+  };
+
   const user = useAuthUser();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [limitCount, setLimitCount] = useState(4);
   const [difficulty, setDifficulty] = useState("");
-  
-  // 이미지 상태: 메인 이미지와 추가 이미지(최대 5개)
+
+  // 이미지 상태
   const [mainImageFile, setMainImageFile] = useState<File | null>(null);
   const [mainImagePreview, setMainImagePreview] = useState<string | null>(null);
   const [extraImageFiles, setExtraImageFiles] = useState<File[]>([]);
@@ -44,33 +56,23 @@ export default function GuildMissionModal({
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // 난이도 옵션
-  const difficultyOptions = [
-    "쉬움",
-    "보통",
-    "어려움",
-  ];
+  const difficultyOptions = ["쉬움", "보통", "어려움"];
 
-  // 컴포넌트 언마운트 시 preview URL 정리
   useEffect(() => {
     return () => {
-      if (mainImagePreview) {
-        URL.revokeObjectURL(mainImagePreview);
-      }
+      if (mainImagePreview) URL.revokeObjectURL(mainImagePreview);
       extraImagePreviews.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [mainImagePreview, extraImagePreviews]);
 
-  // 모달이 닫힐 때 preview URL 정리
   useEffect(() => {
     if (!open) {
-      if (mainImagePreview) {
-        URL.revokeObjectURL(mainImagePreview);
-        setMainImagePreview(null);
-      }
+      if (mainImagePreview) URL.revokeObjectURL(mainImagePreview);
       extraImagePreviews.forEach((url) => URL.revokeObjectURL(url));
+
+      setMainImagePreview(null);
       setExtraImagePreviews([]);
-      // 폼 초기화
+
       setTitle("");
       setContent("");
       setLimitCount(4);
@@ -79,83 +81,67 @@ export default function GuildMissionModal({
       setExtraImageFiles([]);
       setErrorMessage(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   if (!open) return null;
 
-  // 메인 이미지 선택 핸들러
   const handleMainImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) {
       setMainImageFile(null);
-      if (mainImagePreview) {
-        URL.revokeObjectURL(mainImagePreview);
-      }
+      if (mainImagePreview) URL.revokeObjectURL(mainImagePreview);
       setMainImagePreview(null);
       return;
     }
 
     const file = files[0];
-    if (mainImagePreview) {
-      URL.revokeObjectURL(mainImagePreview);
-    }
+    if (mainImagePreview) URL.revokeObjectURL(mainImagePreview);
+
     setMainImageFile(file);
-    const previewUrl = URL.createObjectURL(file);
-    setMainImagePreview(previewUrl);
+    setMainImagePreview(URL.createObjectURL(file));
+    event.target.value = "";
   };
 
-  // 메인 이미지 삭제 핸들러
   const handleRemoveMainImage = () => {
-    if (mainImagePreview) {
-      URL.revokeObjectURL(mainImagePreview);
-    }
+    if (mainImagePreview) URL.revokeObjectURL(mainImagePreview);
     setMainImageFile(null);
     setMainImagePreview(null);
   };
 
-  // 추가 이미지 선택 핸들러: 최대 5개까지 업로드 가능
-  const handleExtraImagesChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
-  ) => {
+  const handleExtraImagesChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
     const existingCount = extraImageFiles.length;
     const remainingSlots = 5 - existingCount;
-    
+
     if (remainingSlots <= 0) {
       toast.error("추가 사진은 최대 5개까지 업로드할 수 있습니다.");
+      event.target.value = "";
       return;
     }
 
     const newFiles = Array.from(files).slice(0, remainingSlots);
-    const updatedFiles = [...extraImageFiles, ...newFiles];
-    setExtraImageFiles(updatedFiles);
-    
+    setExtraImageFiles((prev) => [...prev, ...newFiles]);
+
     const newPreviews = newFiles.map((file) => URL.createObjectURL(file));
-    setExtraImagePreviews([...extraImagePreviews, ...newPreviews]);
-    
+    setExtraImagePreviews((prev) => [...prev, ...newPreviews]);
+
     event.target.value = "";
   };
 
-  // 추가 이미지 개별 삭제 핸들러
   const handleRemoveExtraImage = (index: number) => {
-    URL.revokeObjectURL(extraImagePreviews[index]);
-    
-    const updatedFiles = extraImageFiles.filter((_, i) => i !== index);
-    const updatedPreviews = extraImagePreviews.filter((_, i) => i !== index);
-    
-    setExtraImageFiles(updatedFiles);
-    setExtraImagePreviews(updatedPreviews);
+    const target = extraImagePreviews[index];
+    if (target) URL.revokeObjectURL(target);
+
+    setExtraImageFiles((prev) => prev.filter((_, i) => i !== index));
+    setExtraImagePreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // 저장 핸들러
   const handleSave = async () => {
-    if (isSaving) {
-      return;
-    }
+    if (isSaving) return;
 
-    // 세션 확인
     if (!user) {
       toast.error("로그인이 필요합니다. 페이지를 새로고침해주세요.");
       return;
@@ -178,7 +164,6 @@ export default function GuildMissionModal({
       let mainImageUrl: string | null = null;
       const extraImageUrls: string[] = [];
 
-      // 메인 이미지 업로드
       if (mainImageFile) {
         const formData = new FormData();
         formData.append("file", mainImageFile);
@@ -191,24 +176,22 @@ export default function GuildMissionModal({
 
         if (!uploadResponse.ok) {
           const errorText = await uploadResponse.text().catch(() => "");
-          let errorMessage = "메인 이미지 업로드에 실패했습니다.";
-          
+          let msg = "메인 이미지 업로드에 실패했습니다.";
+
           if (uploadResponse.status === 401) {
-            errorMessage = "로그인이 필요합니다. 페이지를 새로고침해주세요.";
+            msg = "로그인이 필요합니다. 페이지를 새로고침해주세요.";
           } else if (errorText) {
             try {
               const errorJson = JSON.parse(errorText);
-              errorMessage = errorJson.message || errorMessage;
+              msg = errorJson.message || msg;
             } catch {
-              errorMessage = errorText || errorMessage;
+              msg = errorText || msg;
             }
           }
-          
-          throw new Error(errorMessage);
+          throw new Error(msg);
         }
 
-        const uploadJson =
-          (await uploadResponse.json()) as UploadImageResponse;
+        const uploadJson = (await uploadResponse.json()) as UploadImageResponse;
         mainImageUrl = uploadJson.url ?? uploadJson.data?.url ?? null;
 
         if (!uploadJson.ok || !mainImageUrl) {
@@ -216,7 +199,6 @@ export default function GuildMissionModal({
         }
       }
 
-      // 추가 이미지 업로드
       for (const file of extraImageFiles) {
         const formData = new FormData();
         formData.append("file", file);
@@ -227,85 +209,68 @@ export default function GuildMissionModal({
           body: formData,
         });
 
-        if (!uploadResponse.ok) {
-          continue;
-        }
+        if (!uploadResponse.ok) continue;
 
-        const uploadJson =
-          (await uploadResponse.json()) as UploadImageResponse;
+        const uploadJson = (await uploadResponse.json()) as UploadImageResponse;
         const url = uploadJson.url ?? uploadJson.data?.url;
-        if (url) {
-          extraImageUrls.push(url);
-        }
+        if (uploadJson.ok && url) extraImageUrls.push(url);
       }
 
-      // 미션 생성
       const missionData = {
-        title,
-        content: content || null,
+        title: title.trim(),
+        content: content?.trim() ? content.trim() : null,
         limitCount,
         difficulty: difficulty || null,
         mainImage: mainImageUrl,
         extraImages: extraImageUrls,
       };
-      
+
       const response = await fetch(`/api/guilds/${guildId}/missions`, {
         method: "POST",
         credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(missionData),
       });
 
       if (!response.ok) {
-        let errorMessage = "저장에 실패했습니다.";
+        let msg = "저장에 실패했습니다.";
         try {
           const errorText = await response.text();
           if (errorText) {
             try {
               const errorJson = JSON.parse(errorText);
-              errorMessage = errorJson.message || errorJson.error || errorMessage;
+              msg = errorJson.message || errorJson.error || msg;
             } catch {
-              errorMessage = errorText || errorMessage;
+              msg = errorText || msg;
             }
           }
-        } catch (err) {
-          // 에러 파싱 실패는 무시
-        }
-        throw new Error(errorMessage);
+        } catch {}
+        throw new Error(msg);
       }
 
       const json = (await response.json()) as CreateGuildMissionResponse;
+      if (!json.ok || !json.data) throw new Error(json.error || "저장에 실패했습니다.");
 
-      if (!json.ok || !json.data) {
-        throw new Error(json.error || "저장에 실패했습니다.");
-      }
-      // 입력값 초기화
       setTitle("");
       setContent("");
       setLimitCount(4);
       setDifficulty("");
-      if (mainImagePreview) {
-        URL.revokeObjectURL(mainImagePreview);
-      }
+
+      if (mainImagePreview) URL.revokeObjectURL(mainImagePreview);
       extraImagePreviews.forEach((url) => URL.revokeObjectURL(url));
+
       setMainImageFile(null);
       setMainImagePreview(null);
       setExtraImageFiles([]);
       setExtraImagePreviews([]);
 
-      if (onSaveSuccess) {
-        onSaveSuccess();
-      }
-
+      onSaveSuccess?.();
       onClose();
       toast.success("미션이 생성되었습니다.");
     } catch (error: any) {
       console.error("미션 저장 실패", error);
       setErrorMessage(
-        error?.message ||
-          "미션 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        error?.message || "미션 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
       );
     } finally {
       setIsSaving(false);
@@ -314,44 +279,57 @@ export default function GuildMissionModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(88,58,21,0.7)] backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(247,240,230,0.70)] backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-4xl max-h-[90vh] overflow-y-auto m-4 rounded-lg bg-gradient-to-b from-[#5a3e25] to-[#4a3420] border-2 border-[#6b4e2f] shadow-[0_20px_60px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.1)] relative"
+        className="w-full max-w-4xl max-h-[90vh] overflow-y-auto m-4 rounded-2xl
+          bg-[rgba(255,255,255,0.55)] backdrop-blur-md
+          border border-[#C9A961]/45
+          shadow-[0_24px_70px_rgba(43,29,18,0.22)]
+          relative isolate"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 금속 장식 테두리 */}
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#c9a961] to-transparent opacity-70" />
-        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#c9a961] to-transparent opacity-70" />
+        {/* 골드 포인트 라인 */}
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-[#C9A961]/70 to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-gradient-to-r from-transparent via-[#C9A961]/70 to-transparent" />
 
         {/* 헤더 */}
-        <div className="flex items-center justify-between px-6 py-5 border-b-2 border-[#6b4e2f]">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[#C9A961]/25 bg-[rgba(255,255,255,0.92)] backdrop-blur-sm">
           <div className="flex items-center gap-2">
-            <span className="text-2xl drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-              ⚔️
-            </span>
-            <h2 className="text-xl sm:text-2xl font-black text-[#f4d7aa] tracking-wide">
+            <i className="fas fa-clipboard-list text-[#C9A961]" aria-hidden="true" />
+            <h2 className="text-xl sm:text-2xl font-black text-[#4A3420] tracking-tight">
               연맹 미션 추가
             </h2>
           </div>
+
           <button
             type="button"
             onClick={onClose}
-            className="relative z-50 text-[#d4a574] hover:text-[#f4d7aa] hover:bg-[#6b4e2f]/60 rounded-full w-9 h-9 flex items-center justify-center transition text-lg font-black cursor-pointer active:scale-95 border border-[#6b4e2f]"
+            aria-label="닫기"
+            className="relative z-50 w-9 h-9 rounded-full
+              border border-[#C9A961]/40
+              text-[#6B4E2F]
+              hover:text-[#2B1D12]
+              hover:bg-[rgba(201,169,97,0.14)]
+              active:scale-95 transition flex items-center justify-center"
           >
-            ×
+            <i className="fas fa-xmark" aria-hidden="true" />
           </button>
         </div>
 
-        {/* 폼 내용 */}
-        <div className="p-6 sm:p-7 space-y-6 text-[15px]">
-          {/* 메인 이미지와 기본 정보 */}
+        {/* 폼 */}
+        <div className="p-6 sm:p-7 space-y-6 text-[15px]" style={{ color: THEME.text }}>
           <div className="flex flex-col md:flex-row gap-6">
-            {/* 메인 이미지 업로드 */}
+            {/* 메인 이미지 */}
             <div className="w-full md:w-64 h-52 md:h-64 flex-shrink-0">
               {mainImagePreview ? (
-                <div className="relative w-full h-full rounded-lg overflow-hidden border-2 border-[#6b4e2f] shadow-[0_8px_24px_rgba(0,0,0,0.5)] group bg-[#3a2818]">
+                <div
+                  className="relative w-full h-full rounded-2xl overflow-hidden
+                    border border-[#C9A961]/30
+                    shadow-[0_18px_44px_rgba(43,29,18,0.18)]
+                    group bg-white/40"
+                >
                   <img
                     src={mainImagePreview}
                     alt="메인 이미지 미리보기"
@@ -360,122 +338,189 @@ export default function GuildMissionModal({
                   <button
                     type="button"
                     onClick={handleRemoveMainImage}
-                    className="absolute top-2 right-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 text-sm font-bold shadow-lg"
+                    className="absolute top-2 right-2 w-8 h-8
+                      rounded-full flex items-center justify-center
+                      bg-[rgba(180,35,24,0.12)]
+                      text-[#B42318]
+                      border border-[#B42318]/35
+                      opacity-0 group-hover:opacity-100 transition
+                      hover:bg-[rgba(180,35,24,0.18)]"
                     title="삭제"
+                    aria-label="메인 이미지 삭제"
                   >
-                    ×
+                    <i className="fas fa-trash" aria-hidden="true" />
                   </button>
                 </div>
               ) : (
-                <label className="w-full h-full flex items-center justify-center border-2 border-dashed border-[#6b4e2f] rounded-lg cursor-pointer hover:border-[#c9a961] bg-gradient-to-b from-[#4a3420] to-[#3a2818] transition-colors shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]">
+                <label
+                  className="w-full h-full flex items-center justify-center rounded-2xl cursor-pointer
+                    bg-[rgba(255,255,255,0.55)]
+                    border border-dashed border-[#C9A961]/35
+                    hover:border-[#C9A961]/60
+                    shadow-[0_12px_28px_rgba(43,29,18,0.10)]
+                    transition"
+                >
                   <input
                     type="file"
                     accept="image/*"
                     onChange={handleMainImageChange}
                     className="hidden"
                   />
-                  <div className="text-center text-[#d4a574]">
-                    <div className="text-3xl mb-1">📷</div>
-                    <div className="text-sm font-bold">미션 이미지 추가</div>
+                  <div className="text-center">
+                    <div className="mb-2">
+                      <i className="fas fa-camera text-2xl text-[#C9A961]" aria-hidden="true" />
+                    </div>
+                    <div className="text-sm font-black text-[#4A3420]">미션 이미지 추가</div>
+                    <div className="text-xs mt-2 text-[#6B4E2F]">클릭해서 업로드</div>
                   </div>
                 </label>
               )}
             </div>
 
-            {/* 제목과 설명 */}
+            {/* 제목/설명 */}
             <div className="flex-1 space-y-4">
               <div>
-                <label className="block text-base font-black text-[#f4d7aa] mb-1 tracking-wide">
-                  미션 제목 <span className="text-red-400">*</span>
+                <label className="block text-base font-black text-[#4A3420] mb-1 tracking-tight">
+                  미션 제목 <span className="text-[#B42318]">*</span>
                 </label>
                 <input
                   type="text"
                   placeholder="미션 제목"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full border-2 border-[#6b4e2f] rounded-lg px-3 py-2.5 text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] placeholder:text-[#8b6f47] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]"
+                  className="w-full rounded-2xl px-3 py-2.5 text-base
+                    bg-[rgba(255,255,255,0.55)]
+                    text-[#2B1D12]
+                    placeholder:text-[#6B4E2F]/70
+                    border border-[#C9A961]/35
+                    focus:outline-none focus:ring-2 focus:ring-[#C9A961]/55 focus:border-[#C9A961]/55
+                    shadow-[0_10px_24px_rgba(43,29,18,0.10)]"
                 />
               </div>
+
               <div>
-                <label className="block text-base font-black text-[#f4d7aa] mb-1 tracking-wide">
+                <label className="block text-base font-black text-[#4A3420] mb-1 tracking-tight">
                   미션 설명
                 </label>
                 <textarea
                   placeholder="미션 설명을 입력하세요"
                   value={content}
                   onChange={(e) => setContent(e.target.value)}
-                  className="w-full border-2 border-[#6b4e2f] rounded-lg px-3 py-2.5 h-24 resize-none text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] placeholder:text-[#8b6f47] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]"
+                  className="w-full rounded-2xl px-3 py-2.5 h-28 resize-none text-base
+                    bg-[rgba(255,255,255,0.55)]
+                    text-[#2B1D12]
+                    placeholder:text-[#6B4E2F]/70
+                    border border-[#C9A961]/35
+                    focus:outline-none focus:ring-2 focus:ring-[#C9A961]/55 focus:border-[#C9A961]/55
+                    shadow-[0_10px_24px_rgba(43,29,18,0.10)]"
                 />
               </div>
             </div>
           </div>
 
-          {/* 선착순 인원과 난이도 */}
+          {/* 인원/난이도 */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-base font-black text-[#f4d7aa] mb-1 tracking-wide">
-                선착순 인원 <span className="text-red-400">*</span>
+              <label className="block text-base font-black text-[#4A3420] mb-1 tracking-tight">
+                선착순 인원 <span className="text-[#B42318]">*</span>
               </label>
               <input
                 type="number"
-                min="1"
+                min={1}
                 value={limitCount}
                 onChange={(e) => setLimitCount(Number(e.target.value))}
-                className="w-full border-2 border-[#6b4e2f] rounded-lg px-3 py-2.5 text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]"
+                className="w-full rounded-2xl px-3 py-2.5 text-base
+                  bg-[rgba(255,255,255,0.55)]
+                  text-[#2B1D12]
+                  border border-[#C9A961]/35
+                  focus:outline-none focus:ring-2 focus:ring-[#C9A961]/55 focus:border-[#C9A961]/55
+                  shadow-[0_10px_24px_rgba(43,29,18,0.10)]"
               />
             </div>
+
             <div>
-              <label className="block text-base font-black text-[#f4d7aa] mb-1 tracking-wide">
+              <label className="block text-base font-black text-[#4A3420] mb-1 tracking-tight">
                 난이도
               </label>
-              <select
-                value={difficulty}
-                onChange={(e) => setDifficulty(e.target.value)}
-                className="w-full border-2 border-[#6b4e2f] rounded-lg px-3 py-2.5 text-base bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] focus:outline-none focus:ring-2 focus:ring-[#c9a961] focus:border-[#c9a961] shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]"
-              >
-                <option value="">선택하세요</option>
-                {difficultyOptions.map((diff) => (
-                  <option key={diff} value={diff}>
-                    {diff}
-                  </option>
-                ))}
-              </select>
+
+              <div className="relative">
+                <select
+                  value={difficulty}
+                  onChange={(e) => setDifficulty(e.target.value)}
+                  className="w-full rounded-2xl px-3 py-2.5 text-base
+                    bg-[rgba(255,255,255,0.55)]
+                    text-[#2B1D12]
+                    border border-[#C9A961]/35
+                    focus:outline-none focus:ring-2 focus:ring-[#C9A961]/55 focus:border-[#C9A961]/55
+                    shadow-[0_10px_24px_rgba(43,29,18,0.10)]
+                    appearance-none pr-10"
+                >
+                  <option value="">선택하세요</option>
+                  {difficultyOptions.map((diff) => (
+                    <option key={diff} value={diff}>
+                      {diff}
+                    </option>
+                  ))}
+                </select>
+                <i
+                  className="fas fa-chevron-down absolute right-3 top-1/2 -translate-y-1/2 text-[#6B4E2F]"
+                  aria-hidden="true"
+                />
+              </div>
             </div>
           </div>
 
-          {/* 추가 사진: 최대 5개까지 업로드 가능 */}
+          {/* 추가 사진 */}
           <div>
-            <label className="block text-sm font-black text-[#f4d7aa] mb-2 tracking-wide">
+            <label className="block text-base font-black text-[#4A3420] mb-2 tracking-tight">
               추가 사진 {extraImageFiles.length > 0 && `(${extraImageFiles.length}/5)`}
             </label>
+
             <div className="space-y-3">
               {extraImageFiles.length > 0 && (
-                <div className="grid grid-cols-5 gap-3">
-                {extraImageFiles.map((file, index) => (
-                  <div
-                    key={`${file.name}-${file.size}-${file.lastModified}`}
-                    className="relative w-full aspect-square rounded-lg overflow-hidden border-2 border-[#6b4e2f] shadow-[0_4px_16px_rgba(0,0,0,0.5)] group bg-[#3a2818]"
-                  >
-                    <img
-                      src={extraImagePreviews[index]}
-                      alt={`추가 이미지 ${index + 1}`}
-                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveExtraImage(index)}
-                      className="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600 text-xs font-bold shadow-lg"
-                      title="삭제"
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  {extraImageFiles.map((file, index) => (
+                    <div
+                      key={`${file.name}-${file.size}-${file.lastModified}-${index}`}
+                      className="relative w-full aspect-square rounded-2xl overflow-hidden
+                        border border-[#C9A961]/28
+                        shadow-[0_14px_32px_rgba(43,29,18,0.12)]
+                        group bg-white/40"
                     >
-                      ×
-                    </button>
-                  </div>
-                ))}
+                      <img
+                        src={extraImagePreviews[index]}
+                        alt={`추가 이미지 ${index + 1}`}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveExtraImage(index)}
+                        className="absolute top-2 right-2 w-8 h-8 rounded-full
+                          flex items-center justify-center
+                          bg-[rgba(180,35,24,0.12)]
+                          text-[#B42318]
+                          border border-[#B42318]/35
+                          opacity-0 group-hover:opacity-100 transition
+                          hover:bg-[rgba(180,35,24,0.18)]"
+                        title="삭제"
+                        aria-label={`추가 이미지 ${index + 1} 삭제`}
+                      >
+                        <i className="fas fa-trash" aria-hidden="true" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
-              
+
               {extraImageFiles.length < 5 && (
-                <label className="inline-flex items-center justify-center w-32 h-32 border-2 border-dashed border-[#6b4e2f] rounded-lg cursor-pointer hover:border-[#c9a961] bg-gradient-to-b from-[#4a3420] to-[#3a2818] transition-colors shadow-[inset_0_2px_8px_rgba(0,0,0,0.4)]">
+                <label
+                  className="inline-flex items-center justify-center w-32 h-32 rounded-2xl cursor-pointer
+                    bg-[rgba(255,255,255,0.55)]
+                    border border-dashed border-[#C9A961]/35
+                    hover:border-[#C9A961]/60
+                    shadow-[0_12px_28px_rgba(43,29,18,0.10)]
+                    transition"
+                >
                   <input
                     type="file"
                     accept="image/*"
@@ -484,46 +529,87 @@ export default function GuildMissionModal({
                     multiple
                   />
                   <div className="text-center">
-                    <div className="text-2xl mb-1 text-[#d4a574]">🖼️</div>
-                    <div className="text-xs text-[#d4a574] font-bold">추가</div>
+                    <i className="fas fa-images text-2xl text-[#C9A961]" aria-hidden="true" />
+                    <div className="text-xs mt-2 text-[#6B4E2F] font-bold">추가</div>
+                    <div className="text-[11px] mt-1 text-[#6B4E2F]/70">최대 5개</div>
                   </div>
                 </label>
               )}
-              
+
               {extraImageFiles.length >= 5 && (
-                <p className="text-xs text-[#8b6f47]">
-                  최대 5개까지 업로드할 수 있습니다.
-                </p>
+                <p className="text-xs text-[#6B4E2F]">최대 5개까지 업로드할 수 있습니다.</p>
               )}
             </div>
           </div>
 
-          {/* 에러 메시지 */}
+          {/* 에러 */}
           {errorMessage && (
-            <p className="text-sm text-red-400 font-bold">{errorMessage}</p>
+            <div
+              className="rounded-2xl px-4 py-3
+                bg-[rgba(180,35,24,0.08)]
+                border border-[#B42318]/25"
+            >
+              <p className="text-sm text-[#B42318] font-bold flex items-center gap-2">
+                <i className="fas fa-triangle-exclamation" aria-hidden="true" />
+                {errorMessage}
+              </p>
+            </div>
           )}
 
-          {/* 액션 버튼 */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-[#6b4e2f]">
+          {/* 버튼 */}
+          <div
+            className="flex justify-end gap-3 pt-4 border-t border-[#C9A961]/25
+              bg-[rgba(255,255,255,0.92)] backdrop-blur-sm
+              -mx-6 sm:-mx-7 px-6 sm:px-7 pb-6 sm:pb-7 rounded-b-2xl"
+          >
             <button
               type="button"
               onClick={onClose}
-              className="px-8 py-2.5 rounded-lg bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] text-lg font-black tracking-wide shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)] border-2 border-[#6b4e2f] hover:from-[#5a4430] hover:to-[#4a3828] active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] transition"
+              className="inline-flex items-center gap-2 px-7 py-2.5 rounded-2xl
+                bg-[rgba(255,255,255,0.55)]
+                text-[#6B4E2F]
+                font-black tracking-tight
+                border border-[#C9A961]/30
+                hover:bg-[rgba(201,169,97,0.14)]
+                transition"
             >
+              <i className="fas fa-xmark" aria-hidden="true" />
               취소
             </button>
+
             <button
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="px-8 py-2.5 rounded-lg bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white text-lg font-black tracking-wide shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)] border border-[#c9a961]/30 hover:from-[#9b7f57] hover:to-[#7b5e3f] active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)] transition disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-2 px-7 py-2.5 rounded-2xl
+                bg-gradient-to-b from-[#8B6F47] to-[#4A3420]
+                text-white font-black tracking-tight
+                shadow-[0_14px_30px_rgba(43,29,18,0.20),inset_0_1px_0_rgba(255,255,255,0.22)]
+                border border-[#C9A961]/20
+                hover:from-[#9a7d52] hover:to-[#5a3f28]
+                disabled:opacity-60 disabled:cursor-not-allowed transition"
             >
-              {isSaving ? "등록 중..." : "등록"}
+              {isSaving ? (
+                <>
+                  <i className="fas fa-spinner fa-spin" aria-hidden="true" />
+                  등록 중...
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-floppy-disk" aria-hidden="true" />
+                  등록
+                </>
+              )}
             </button>
+          </div>
+
+          {/* subtle footer note */}
+          <div className="pt-2 text-xs text-[#6B4E2F] flex items-center gap-2">
+            <i className="fas fa-leaf text-[#C9A961]" aria-hidden="true" />
+            Warm Oak · surface UI
           </div>
         </div>
       </div>
     </div>
   );
 }
-

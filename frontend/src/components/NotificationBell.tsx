@@ -3,6 +3,18 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthUser } from "@/store/authStore";
 
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faBell, faCheckDouble } from "@fortawesome/free-solid-svg-icons";
+
+// Warm Oak tokens
+const SURFACE = "rgba(255,255,255,0.55)";
+const TEXT = "#2B1D12";
+const MUTED = "#6B4E2F";
+const BRAND = "#C9A961";
+const BRAND2 = "#8B6F47";
+const BRAND3 = "#4A3420";
+const DANGER = "#B42318";
+
 type Notification = {
   id: string;
   userId: number;
@@ -38,7 +50,6 @@ export default function NotificationBell() {
   const user = useAuthUser();
   const navigate = useNavigate();
 
-  // 🔔 + 드롭다운 전체를 감쌀 ref
   const wrapperRef = useRef<HTMLDivElement | null>(null);
 
   // =========================
@@ -65,7 +76,6 @@ export default function NotificationBell() {
 
       if (json.ok) {
         if (json.data && Array.isArray(json.data)) {
-          // 안 읽은 알림만 보여주기
           setNotifications(json.data.filter((n) => !n.isRead));
         } else {
           setNotifications([]);
@@ -110,7 +120,6 @@ export default function NotificationBell() {
     loadNotifications();
     loadUnreadCount();
 
-    // 30초마다 개수만 갱신
     const interval = setInterval(() => {
       loadUnreadCount();
     }, 30000);
@@ -125,10 +134,7 @@ export default function NotificationBell() {
     if (!showDropdown) return;
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        wrapperRef.current &&
-        !wrapperRef.current.contains(e.target as Node)
-      ) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
         setShowDropdown(false);
       }
     };
@@ -143,7 +149,6 @@ export default function NotificationBell() {
   const handleNotificationClick = async (notification: Notification) => {
     if (!notification.recordId || !notification.guildId) return;
 
-    // 알림 읽음 처리
     if (!notification.isRead) {
       try {
         await fetch(`/api/guilds/notifications/${notification.id}/read`, {
@@ -155,18 +160,14 @@ export default function NotificationBell() {
       }
     }
 
-    // 길드 방으로 이동 (/guilds ❌ → /guild ✅)
     const guildIdStr = String(notification.guildId);
     const targetPath = `/guild/${guildIdStr}/room?recordId=${notification.recordId}`;
     navigate(targetPath, { replace: false });
 
-    // 프론트에서 바로 제거 & 카운트 감소
     setNotifications((prev) => prev.filter((n) => n.id !== notification.id));
     setUnreadCount((prev) => Math.max(0, prev - 1));
-
     setShowDropdown(false);
 
-    // 서버 기준으로 동기화
     setTimeout(() => {
       loadNotifications();
       loadUnreadCount();
@@ -196,17 +197,35 @@ export default function NotificationBell() {
     <div className="relative" ref={wrapperRef}>
       {/* 종 아이콘 버튼 */}
       <button
+        type="button"
         onClick={() => {
           setShowDropdown((prev) => !prev);
-          if (!showDropdown) {
-            loadNotifications();
-          }
+          if (!showDropdown) loadNotifications();
         }}
-        className="relative p-2 text-stone-600 hover:text-stone-800 transition"
+        className="relative inline-flex items-center justify-center rounded-xl p-2 transition outline-none
+                   focus-visible:ring-2 focus-visible:ring-offset-2"
+        style={{
+          color: BRAND3,
+          background: "rgba(255,255,255,0.35)",
+          border: "1px solid rgba(201,169,97,0.25)",
+          boxShadow:
+            "0 10px 24px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.30)",
+        }}
       >
-        <span className="text-2xl">🔔</span>
+        <FontAwesomeIcon icon={faBell} className="text-lg" />
+
+        {/* unread badge */}
         {unreadCount > 0 && (
-          <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+          <span
+            className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full
+                       text-[11px] font-black flex items-center justify-center"
+            style={{
+              background: DANGER, // 너무 튀지 않게: 진한 레드 + 작은 사이즈
+              color: "#fff",
+              border: "1px solid rgba(255,255,255,0.35)",
+              boxShadow: "0 8px 18px rgba(0,0,0,0.20)",
+            }}
+          >
             {unreadCount > 9 ? "9+" : unreadCount}
           </span>
         )}
@@ -214,30 +233,58 @@ export default function NotificationBell() {
 
       {/* 드롭다운 */}
       {showDropdown && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-stone-200 z-50">
-          <div className="p-4 border-b flex items-center justify-between">
-            <h3 className="font-bold text-stone-800">알림</h3>
+        <div
+          className="absolute right-0 mt-2 w-80 rounded-2xl z-50 overflow-hidden"
+          style={{
+            background: SURFACE,
+            border: "1px solid rgba(201,169,97,0.28)",
+            boxShadow: "0 24px 60px rgba(0,0,0,0.18)",
+            backdropFilter: "blur(10px)",
+          }}
+        >
+          {/* 헤더 */}
+          <div
+            className="p-4 flex items-center justify-between"
+            style={{
+              borderBottom: "1px solid rgba(107,78,47,0.18)",
+            }}
+          >
+            <h3 className="font-black tracking-wide" style={{ color: TEXT }}>
+              알림
+            </h3>
+
             {unreadCount > 0 && (
               <button
+                type="button"
                 onClick={handleMarkAllAsRead}
-                className="text-xs text-blue-500 hover:text-blue-700"
+                className="inline-flex items-center gap-2 text-xs font-black tracking-wide rounded-xl px-3 py-2 transition"
+                style={{
+                  color: "#fff",
+                  background: `linear-gradient(180deg, ${BRAND2}, ${MUTED})`,
+                  border: "1px solid rgba(201,169,97,0.30)",
+                  boxShadow:
+                    "0 10px 24px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.18)",
+                }}
               >
-                모두 읽음
+                <FontAwesomeIcon icon={faCheckDouble} />
+                <span>모두 읽음</span>
               </button>
             )}
           </div>
 
+          {/* 목록 */}
           <div
             className={`divide-y ${
               notifications.length > 3 ? "max-h-60 overflow-y-auto" : ""
             }`}
+            style={{ borderColor: "rgba(107,78,47,0.16)" }}
           >
             {loading ? (
-              <div className="p-4 text-center text-stone-500 text-sm">
+              <div className="p-4 text-center text-sm font-medium" style={{ color: MUTED }}>
                 로딩 중...
               </div>
             ) : notifications.length === 0 ? (
-              <div className="p-4 text-center text-stone-500 text-sm">
+              <div className="p-4 text-center text-sm font-medium" style={{ color: MUTED }}>
                 알림이 없습니다.
               </div>
             ) : (
@@ -245,33 +292,73 @@ export default function NotificationBell() {
                 <div
                   key={notification.id}
                   onClick={() => handleNotificationClick(notification)}
-                  className={`p-4 cursor-pointer hover:bg-stone-50 transition ${
-                    !notification.isRead ? "bg-blue-50" : ""
-                  }`}
+                  className="p-4 cursor-pointer transition"
+                  style={{
+                    background: "transparent",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.background =
+                      "rgba(201,169,97,0.10)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLDivElement).style.background =
+                      "transparent";
+                  }}
                 >
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#8b6f47] to-[#6b4e2f] text-sm flex items-center justify-center text-white font-black flex-shrink-0">
-                      {notification.fromUserName?.[0] ||
-                        notification.fromUserEmail[0]}
+                    {/* 아바타 */}
+                    <div
+                      className="w-9 h-9 rounded-full flex items-center justify-center font-black flex-shrink-0"
+                      style={{
+                        background: `linear-gradient(180deg, ${BRAND2}, ${MUTED})`,
+                        color: "#fff",
+                        border: "1px solid rgba(201,169,97,0.28)",
+                        boxShadow:
+                          "0 10px 24px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.18)",
+                      }}
+                    >
+                      {notification.fromUserName?.[0] || notification.fromUserEmail[0]}
                     </div>
+
+                    {/* 본문 */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-stone-800 font-medium break-words">
+                      <p
+                        className="text-sm font-medium break-words"
+                        style={{ color: TEXT }}
+                      >
                         {notification.content || "새 알림이 있습니다."}
                       </p>
-                      <p className="text-xs text-stone-500 mt-1">
-                        {new Date(notification.createdAt).toLocaleString(
-                          "ko-KR",
-                        )}
+                      <p className="text-xs mt-1 font-medium" style={{ color: MUTED }}>
+                        {new Date(notification.createdAt).toLocaleString("ko-KR")}
                       </p>
                     </div>
+
+                    {/* 읽지 않음 점 */}
                     {!notification.isRead && (
-                      <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-2" />
+                      <div
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0 mt-2"
+                        style={{
+                          background: BRAND,
+                          boxShadow: "0 0 0 3px rgba(201,169,97,0.18)",
+                        }}
+                        title="읽지 않은 알림"
+                      />
                     )}
                   </div>
                 </div>
               ))
             )}
           </div>
+
+          {/* 바닥 장식 */}
+          <div
+            className="h-1"
+            style={{
+              background:
+                "linear-gradient(90deg, transparent, rgba(201,169,97,0.55), transparent)",
+              opacity: 0.8,
+            }}
+          />
         </div>
       )}
     </div>

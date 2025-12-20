@@ -1,90 +1,63 @@
 /**
  * BeforeLogin (로그인 전 메인 화면)
- * ─────────────────────────────────────────────────────────
- * 목적: 아직 로그인하지 않은 사용자가 처음 보게 되는 랜딩 화면입니다.
- *       - 상단 헤더에서는 서비스 진입(메뉴/로고)을 잠그고, 로그인/회원가입 버튼만 허용합니다.
- *       - 로그인/회원가입(모달) 성공 시, 항상 대시보드("/dashboard")로 이동시킵니다.
- *
- * 이 파일을 보면 좋은 사람
- *  - 기획/디자인/QA: 로그인 전 화면의 **흐름**(잠금/모달/리다이렉트)을 이해할 때
- *
- * 핵심 동작 요약
- *  1) 아직 로그인/세션 확인 중(checking === true)이면 로딩 화면만 보여준다.
- *  2) 이미 로그인 상태라면 이 페이지에 올 일이 없으므로 즉시 "/dashboard"로 보낸다.
- *  3) 모달에서 로그인/회원가입이 성공하면 "/dashboard"로 이동한다.
+ * - 로직 유지
+ * - Warm Oak 팔레트 적용
+ * - 이모지 제거 → FontAwesome(solid)
  */
 
 import { useState, useEffect, useRef } from "react";
-import Hero from "@/components/Hero"; // 상단 대표 배너(풀-블리드로 보이는 시각 요소)
-import HeaderNav from "@/components/HeaderNav"; // 상단 네비게이션 (여기서는 잠금 모드로 사용)
-import SignupModal from "@/components/SignupModal"; // 로그인/회원가입 통합 모달
-import { useNavigate } from "react-router-dom"; // 페이지 이동을 위한 라우터 훅
-import { useAuth, useAuthGate } from "@/store/authStore"; // ✅ 전역 인증 스토어 + 게이트 훅
+import HeaderNav from "@/components/HeaderNav";
+import SignupModal from "@/components/SignupModal";
+import { useNavigate } from "react-router-dom";
+import { useAuth, useAuthGate } from "@/store/authStore";
+import { AnimatePresence, motion } from "framer-motion";
 
-// 로그인 성공 후 이동할 경로 (지금은 항상 대시보드로 고정)
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faBookmark,
+  faCompass,
+  faShield,
+  faFlag,
+  faRightToBracket,
+  faScroll,
+} from "@fortawesome/free-solid-svg-icons";
+
 const AFTER_LOGIN_PATH = "/dashboard";
 
-/**
- * 로그인 전 메인 화면 컴포넌트
- * - 상단 헤더는 잠금(lockNav/lockLogo) 상태로 렌더됩니다.
- * - 중앙에는 히어로 섹션과 로그인/회원가입 CTA 버튼을 보여줍니다.
- * - 모달(SignupModal)에서 실제 인증을 수행합니다.
- */
+// Warm Oak
+const BG = "#F7F0E6";
+const TEXT = "#2B1D12";
+const MUTED = "#6B4E2F";
+const BRAND = "#C9A961";
+const BRAND2 = "#8B6F47";
+const BRAND3 = "#4A3420";
+
 export default function BeforeLogin() {
   const navigate = useNavigate();
 
-  // ✅ 다른 곳(HomeGate/ProtectedRoute)과 동일한 기준으로 로그인 상태 파악
-  //  - checking: 아직 서버에 /auth/me 등을 날려서 로그인/세션 체크 중인지 여부
-  //  - isLoggedIn: 최종적으로 로그인된 상태인지 여부
   const { checking, isLoggedIn } = useAuthGate();
-
-  // 전역 auth 스토어 액션들
   const bootstrap = useAuth((s) => s.bootstrap);
   const setLoggedIn = useAuth((s) => s.setLoggedIn);
 
-  // 인증 모달 열림 상태 (true=열림, false=닫힘)
   const [open, setOpen] = useState(false);
-  // 모달 최초 모드: "login" 또는 "signup" (버튼으로 무엇을 눌렀는지 반영)
   const [initialMode, setInitialMode] = useState<"login" | "signup">("login");
-
-  // React 18/StrictMode 등에서 onSuccess가 중복 호출되는 것을 방지하는 가드
   const handledAuthSuccess = useRef(false);
 
-  // 로그인/회원가입 버튼 클릭 시 모달 열기
   const openAuth = (mode: "login" | "signup") => {
     setInitialMode(mode);
     setOpen(true);
   };
 
-  /**
-   * [중요] 자동 이동(useEffect)
-   * - 로그인/세션 체크가 끝난 뒤(checking === false)에만 isLoggedIn을 신뢰합니다.
-   * - 이미 로그인 상태라면 즉시 "/dashboard"로 이동합니다.
-   *   (예: 새로고침 후 /before-login으로 온 경우)
-   */
   useEffect(() => {
-    // 아직 로그인/세션 체크 중이면 아무 것도 하지 않음
     if (checking) return;
-
-    // 미로그인 상태라면 이 페이지를 그대로 보여줌
     if (!isLoggedIn) return;
-
-    // 이미 로그인 상태에서 /before-login 진입 시 → 자동으로 대시보드로 보냄
     navigate(AFTER_LOGIN_PATH, { replace: true });
   }, [checking, isLoggedIn, navigate]);
 
-  /**
-   * 모달 안에서 로그인/회원가입이 성공했을 때 호출되는 콜백
-   * - 1) 세션 쿠키 기반으로 /auth/me 호출 → 전역 auth 스토어 동기화
-   * - 2) "/dashboard"로 페이지 이동
-   */
   const handleAuthSuccess = async (user: any) => {
-    // React 18 StrictMode나 중복 트리거에 대비: 성공 처리 한 번만 수행
     if (handledAuthSuccess.current) return;
     handledAuthSuccess.current = true;
 
-    // 1차로, 서버 응답에서 받은 사용자 정보로 전역 auth 상태를 즉시 갱신
-    //    → isLoggedIn 이 바로 true가 되어 ProtectedRoute가 즉시 대시보드를 허용합니다.
     try {
       setLoggedIn(user as any);
     } catch (e) {
@@ -92,93 +65,268 @@ export default function BeforeLogin() {
     }
 
     try {
-      // ✅ 로그인 직후에는 강제로 세션 재동기화
       await bootstrap();
     } catch (e) {
-      // 서버/네트워크 오류가 있어도 다음 화면으로 이동하면
-      // 보호 라우터(ProtectedRoute)가 최종 isLoggedIn 여부에 따라 적절히 처리함
       console.error("로그인 후 bootstrap 중 오류:", e);
     }
 
-    // 모달 닫고
     setOpen(false);
-
-    // 무조건 "/dashboard"로 이동
     navigate(AFTER_LOGIN_PATH, { replace: true });
   };
 
-  // ✅ 아직 로그인/세션 상태를 확인하는 중이라면,
-  //    로그인 전/후 화면을 번갈아 깜빡이지 않도록 간단한 로딩 화면만 보여줍니다.
   if (checking) {
     return (
-      <div className="min-h-screen bg-[#fdf8f1] flex items-center justify-center">
-        <p className="text-sm text-[#6b4e2f] font-medium">로그인 상태를 확인하는 중입니다...</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: BG }}>
+        <div className="text-center">
+          <div
+            className="mx-auto h-10 w-10 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ borderColor: MUTED, borderTopColor: "transparent" }}
+          />
+          <p className="mt-4 text-sm font-semibold" style={{ color: MUTED }}>
+            로그인 상태를 확인하는 중...
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#fdf8f1] text-stone-800">
-      {/**
-       * 상단 네비게이션(잠금 모드)
-       * - 로그인 전에는 서비스 내비게이션을 사용할 수 없도록 잠급니다.
-       *   · lockNav  : 상단 메뉴 클릭 비활성화
-       *   · lockLogo : 로고 클릭 시 홈/대시보드 진입 차단
-       *   · onOpenAuth: 헤더의 로그인/회원가입 버튼 클릭 시 모달 열기
-       *   · authButtons="none": 헤더 오른쪽 인증 버튼 영역을 숨김 (아래 CTA만 보이도록)
-       */}
-      <HeaderNav lockNav lockLogo onOpenAuth={openAuth} authButtons="none" />
-
-      {/** 본문 컨테이너: 헤더와 간격, 좌우 패딩, 최대 폭 제어 */}
-      <main className="mx-auto max-w-6xl px-5 pt-12 md:pt-16 pb-14">
-        {/* 히어로 섹션(브랜드/메시지/이미지 등) */}
-        <Hero />
-
-        {/* 중앙 CTA: 로그인 / 회원가입 버튼 */}
-        <div className="mt-10 flex justify-center gap-5">
-          <button
-            type="button"
-            onClick={() => openAuth("login")}
-            className="px-8 py-3 rounded-lg bg-gradient-to-b from-[#8b6f47] to-[#6b4e2f] text-white text-sm font-black tracking-wide hover:from-[#9b7f57] hover:to-[#7b5e3f] transition-all shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.2)] border border-[#c9a961]/30 active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]"
-            aria-label="로그인하기"
-          >
-            ⚔️ 로그인
-          </button>
-          <button
-            type="button"
-            onClick={() => openAuth("signup")}
-            className="px-8 py-3 rounded-lg bg-gradient-to-b from-[#4a3420] to-[#3a2818] text-[#d4a574] text-sm font-black tracking-wide hover:from-[#5a4430] hover:to-[#4a3828] transition-all shadow-[0_4px_12px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)] border-2 border-[#6b4e2f] active:shadow-[inset_0_2px_8px_rgba(0,0,0,0.6)]"
-            aria-label="회원가입하기"
-          >
-            📜 회원가입
-          </button>
-        </div>
-      </main>
-
-      {/* 풋터(간단 저작권 표기) */}
-      <footer className="mt-16 py-10 text-center relative">
-        {/* 장식 라인 */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-px bg-gradient-to-r from-transparent via-[#c9a961] to-transparent" />
-        <p className="text-xs text-[#8b6f47] font-medium">
-          © {new Date().getFullYear()} 취향도감. All rights reserved.
-        </p>
-      </footer>
-
-      {/**
-       * 통합 인증 모달(SignupModal)
-       * - `initialMode`로 로그인/회원가입 탭 중 무엇을 먼저 보여줄지 결정합니다.
-       * - onSuccess: 인증 성공 시 "/dashboard"로 이동합니다.
-       */}
-      <SignupModal
-        open={open}
-        initialMode={initialMode}
-        onClose={() => {
-          setOpen(false);
-          handledAuthSuccess.current = false;
-        }}
-        onSwitchMode={(m: "login" | "signup") => setInitialMode(m)}
-        onSuccess={handleAuthSuccess}
+    <div className="min-h-screen relative overflow-hidden" style={{ color: TEXT }}>
+      {/* Warm Oak 배경 */}
+      <div
+        className="
+          absolute inset-0
+          bg-[repeating-linear-gradient(90deg,rgba(107,78,47,0.06)_0px,rgba(107,78,47,0.06)_18px,rgba(255,255,255,0.02)_18px,rgba(255,255,255,0.02)_36px)]
+        "
+        style={{ backgroundColor: BG }}
       />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(201,169,97,0.22),transparent_55%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(107,78,47,0.18),transparent_55%)]" />
+      <div className="absolute inset-0 shadow-[inset_0_0_140px_rgba(0,0,0,0.12)]" />
+
+      <div className="relative">
+        <HeaderNav lockNav lockLogo onOpenAuth={openAuth} authButtons="none" />
+
+        <main className="mx-auto max-w-6xl px-5 pt-12 md:pt-16 pb-14">
+          <motion.section
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, ease: "easeOut" }}
+            className="grid gap-8 md:grid-cols-[1.15fr_0.85fr] items-center"
+          >
+            {/* 좌: 히어로 */}
+            <div className="relative">
+              <div
+                className="absolute -top-4 left-0 h-px w-40 bg-gradient-to-r from-transparent to-transparent"
+                style={{ backgroundImage: `linear-gradient(90deg,transparent,${BRAND},transparent)` }}
+              />
+              <div
+                className="absolute -bottom-4 right-0 h-px w-40 bg-gradient-to-r from-transparent to-transparent"
+                style={{ backgroundImage: `linear-gradient(90deg,transparent,${MUTED},transparent)` }}
+              />
+
+              <div
+                className="rounded-2xl backdrop-blur p-7 md:p-10 relative overflow-hidden"
+                style={{
+                  background: `linear-gradient(180deg, rgba(255,255,255,0.62), rgba(255,255,255,0.28))`,
+                  border: `1px solid rgba(201,169,97,0.35)`,
+                  boxShadow: "0 18px 60px rgba(0,0,0,0.14)",
+                }}
+              >
+                <div className="absolute inset-0 opacity-55 bg-[radial-gradient(circle_at_20%_0%,rgba(201,169,97,0.26),transparent_55%)]" />
+                <div className="absolute inset-0 opacity-45 bg-[radial-gradient(circle_at_90%_30%,rgba(107,78,47,0.18),transparent_58%)]" />
+
+                <div className="relative">
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05, duration: 0.45, ease: "easeOut" }}
+                    className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-bold"
+                    style={{
+                      background: "rgba(255,255,255,0.40)",
+                      border: "1px solid rgba(107,78,47,0.25)",
+                      color: MUTED,
+                    }}
+                  >
+                    <span className="inline-block h-2 w-2 rounded-full" style={{ background: BRAND }} />
+                    취향을 기록하고, 공유하고, 더 똑똑하게 추천받기
+                  </motion.div>
+
+                  <motion.h1
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.12, duration: 0.5, ease: "easeOut" }}
+                    className="mt-4 text-3xl md:text-4xl font-black tracking-tight"
+                    style={{ color: TEXT }}
+                  >
+                    취향도감
+                    <span className="block mt-2 text-base md:text-lg font-semibold" style={{ color: MUTED }}>
+                      당신의 취향을 정리해두는 공간
+                    </span>
+                  </motion.h1>
+
+                  <motion.p
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2, duration: 0.5, ease: "easeOut" }}
+                    className="mt-5 text-sm md:text-base leading-relaxed"
+                    style={{ color: "rgba(43,29,18,0.82)" }}
+                  >
+                    로그인 후 대시보드에서 기록을 모아보고, 추천을 받고, 커뮤니티 활동까지 한 번에.
+                    <br className="hidden md:block" />
+                    시작하려면 아래에서 로그인/회원가입을 진행하세요.
+                  </motion.p>
+
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.28, duration: 0.5, ease: "easeOut" }}
+                    className="mt-7 grid gap-3 sm:grid-cols-3"
+                  >
+                    {[
+                      { icon: faBookmark, title: "기록", desc: "나만의 취향 아카이브" },
+                      { icon: faCompass, title: "추천", desc: "데이터 기반 추천" },
+                      { icon: faShield, title: "길드", desc: "같이 즐기는 미션" },
+                    ].map((x) => (
+                      <div
+                        key={x.title}
+                        className="rounded-xl px-4 py-3"
+                        style={{
+                          background: "rgba(255,255,255,0.40)",
+                          border: "1px solid rgba(107,78,47,0.20)",
+                        }}
+                      >
+                        <p className="text-xs font-black flex items-center gap-2" style={{ color: MUTED }}>
+                          <FontAwesomeIcon icon={x.icon} style={{ color: MUTED }} />
+                          {x.title}
+                        </p>
+                        <p className="mt-1 text-xs" style={{ color: "rgba(43,29,18,0.72)" }}>
+                          {x.desc}
+                        </p>
+                      </div>
+                    ))}
+                  </motion.div>
+                </div>
+              </div>
+            </div>
+
+            {/* 우: CTA */}
+            <motion.aside
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.18, duration: 0.55, ease: "easeOut" }}
+              className="rounded-2xl backdrop-blur p-7 md:p-8 relative overflow-hidden"
+              style={{
+                background: "rgba(255,255,255,0.35)",
+                border: "1px solid rgba(107,78,47,0.22)",
+                boxShadow: "0 16px 50px rgba(0,0,0,0.12)",
+              }}
+            >
+              <div className="absolute inset-0 opacity-60 bg-[radial-gradient(circle_at_20%_20%,rgba(201,169,97,0.22),transparent_55%)]" />
+              <div className="absolute inset-0 opacity-50 bg-[radial-gradient(circle_at_90%_70%,rgba(107,78,47,0.16),transparent_58%)]" />
+
+              <div className="relative">
+                <motion.div
+                  animate={{ y: [0, -6, 0] }}
+                  transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+                  className="text-3xl"
+                  style={{ color: MUTED }}
+                  aria-hidden
+                >
+                  <FontAwesomeIcon icon={faFlag} />
+                </motion.div>
+
+                <h2 className="mt-3 text-lg font-black" style={{ color: TEXT }}>
+                  지금 바로 시작하기
+                </h2>
+                <p className="mt-2 text-sm" style={{ color: "rgba(43,29,18,0.75)" }}>
+                  로그인/회원가입 성공 시 자동으로 대시보드로 이동합니다.
+                </p>
+
+                <div className="mt-6 flex flex-col gap-3">
+                  <motion.button
+                    type="button"
+                    onClick={() => openAuth("login")}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="
+                      w-full px-6 py-3 rounded-xl
+                      text-white text-sm font-black tracking-wide
+                      inline-flex items-center justify-center gap-2
+                      outline-none focus:outline-none
+                      focus-visible:ring-2 focus-visible:ring-offset-2
+                    "
+                    style={{
+                      background: `linear-gradient(180deg, ${BRAND2}, ${MUTED})`,
+                      border: "1px solid rgba(201,169,97,0.28)",
+                      boxShadow: "0 10px 26px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.18)",
+                    }}
+                    aria-label="로그인하기"
+                  >
+                    <FontAwesomeIcon icon={faRightToBracket} />
+                    로그인
+                  </motion.button>
+
+                  <motion.button
+                    type="button"
+                    onClick={() => openAuth("signup")}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="
+                      w-full px-6 py-3 rounded-xl
+                      text-sm font-black tracking-wide
+                      inline-flex items-center justify-center gap-2
+                      outline-none focus:outline-none
+                      focus-visible:ring-2 focus-visible:ring-offset-2
+                    "
+                    style={{
+                      background: `linear-gradient(180deg, ${BRAND3}, ${TEXT})`,
+                      color: BG,
+                      border: "1px solid rgba(107,78,47,0.35)",
+                      boxShadow: "0 10px 26px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.10)",
+                    }}
+                    aria-label="회원가입하기"
+                  >
+                    <FontAwesomeIcon icon={faScroll} />
+                    회원가입
+                  </motion.button>
+                </div>
+              </div>
+            </motion.aside>
+          </motion.section>
+        </main>
+
+        <footer className="mt-10 py-10 text-center relative">
+          <div
+            className="absolute top-0 left-1/2 -translate-x-1/2 w-56 h-px"
+            style={{ backgroundImage: `linear-gradient(90deg,transparent,${BRAND},transparent)` }}
+          />
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.35, duration: 0.6 }}
+            className="text-xs font-semibold"
+            style={{ color: BRAND2 }}
+          >
+            © {new Date().getFullYear()} 취향도감. All rights reserved.
+          </motion.p>
+        </footer>
+
+        <AnimatePresence>
+          {open && (
+            <SignupModal
+              open={open}
+              initialMode={initialMode}
+              onClose={() => {
+                setOpen(false);
+                handledAuthSuccess.current = false;
+              }}
+              onSwitchMode={(m: "login" | "signup") => setInitialMode(m)}
+              onSuccess={handleAuthSuccess}
+            />
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
