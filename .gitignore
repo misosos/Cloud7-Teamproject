@@ -60,4 +60,12 @@ coverage/
 # User uploaded files (do not commit)
 backend/uploads/
 uploads/
+
 .vscode
+
+
+# Backend served frontend build artifacts (do not commit)
+backend/client/
+
+# VSCode (ignore all)
+.vscode/
