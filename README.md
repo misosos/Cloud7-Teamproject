@@ -53,8 +53,16 @@ npx prisma generate
 # 최초 스키마 적용(개발용) — 마이그레이션 생성 + 적용
 npx prisma migrate dev --name init
 
-# 팀 동기화/배포 환경 — 기존 마이그레이션만 적용
+# schema.prisma가 변경되었을때[팀원이 변경]
+npx prisma db push
+npx prisma generate
+
+# db push / migrate 이후, 다른 브랜치에서 스키마 변경을 pull 했을 때
+npx prisma generate
+
+# 팀 동기화/배포 환경 — 기존 마이그레이션만 적용[내가 변경]
 npx prisma migrate deploy
+npx prisma generate
 
 # (선택) 시드 데이터 투입
 npx prisma db seed
