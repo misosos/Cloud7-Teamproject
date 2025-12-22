@@ -1,7 +1,7 @@
 /**********************************************************************************
  * Express 앱 전역 설정 파일 (app.ts)
- * - ✅ production 세션 MemoryStore 경고 해결: Redis/Valkey 기반 connect-redis 적용
- * - ✅ HTTP/HTTPS 혼재 환경 대응: env.HTTPS로 secure/sameSite 제어 유지
+ * - production 세션 MemoryStore 경고 해결: Redis/Valkey 기반 connect-redis 적용
+ * - HTTP/HTTPS 혼재 환경 대응: env.HTTPS로 secure/sameSite 제어 유지
  **********************************************************************************/
 
 import express, { type Request, type Response, type NextFunction } from "express";
@@ -13,7 +13,7 @@ import helmet from "helmet";
 import compression from "compression";
 import path from "path";
 
-// ✅ session store
+// session store
 import { RedisStore } from "connect-redis";
 import { createClient } from "redis";
 
@@ -56,7 +56,7 @@ app.use(cookieParser());
  * ============================================================================ */
 const isProd = env.NODE_ENV === "production";
 
-// ⚠️ "production"이어도 HTTP일 수 있음
+//  "production"이어도 HTTP일 수 있음
 // => secure(true)면 브라우저가 쿠키를 버려서 로그인 유지가 깨짐
 const isHttps = String(env.HTTPS).toLowerCase() === "true"; // .env에 HTTPS=true면 https로 간주
 
@@ -120,7 +120,6 @@ const corsOptions: CorsOptions = {
 
 app.use(cors(corsOptions));
 
-// ✅ 여기서 "*" 쓰면 path-to-regexp 에러날 수 있음 -> 정규식
 app.options(/.*/, cors(corsOptions));
 
 /* ==============================================================================
@@ -131,14 +130,22 @@ app.set("trust proxy", 1);
 /* ==============================================================================
  *  6. session (Redis/Valkey store)
  * ============================================================================ */
-// ✅ Valkey/Redis URL (예: redis://127.0.0.1:6379)
-// - 로컬/서버 공통으로 .env에 REDIS_URL 추천
-const REDIS_URL = process.env.REDIS_URL || "redis://127.0.0.1:6379";
 
-const redisClient = createClient({ url: REDIS_URL });
-redisClient.connect().catch((err) => {
-  console.error("[redis] connect error:", err);
-});
+const REDIS_URL = process.env.REDIS_URL; 
+const useRedis = Boolean(REDIS_URL);     // 있을 때만 Redis 사용
+
+let redisClient: ReturnType<typeof createClient> | null = null;
+let redisStore: RedisStore | undefined;
+
+if (useRedis) {
+  redisClient = createClient({ url: REDIS_URL });
+  redisClient.on("error", (err) => console.error("[redis] error:", err));
+  redisClient.connect().catch((err) => {
+    console.error("[redis] connect error:", err);
+  });
+
+  redisStore = new RedisStore({ client: redisClient });
+}
 
 app.use(
   session({
@@ -147,21 +154,13 @@ app.use(
     resave: false,
     saveUninitialized: false,
 
-    // proxy 옵션은 secure 쿠키(HTTPS)에서만 의미가 큼
     proxy: isProd,
-
-    // ✅ production MemoryStore 경고 제거
-    store: new RedisStore({ client: redisClient }),
+    store: redisStore, //  없으면 MemoryStore(기본)로 동작
 
     cookie: {
       httpOnly: true,
-
-      // ✅ HTTPS면 cross-site 쿠키 가능하도록 none/secure
-      // ✅ HTTP면 secure 쿠키는 무조건 폐기되므로 lax/false로 강제
       sameSite: isHttps ? "none" : "lax",
-      secure: isHttps, // HTTP면 false여야 함
-      // domain: env.COOKIE_DOMAIN ?? undefined,
-      // maxAge: 7 * 24 * 60 * 60 * 1000,
+      secure: isHttps,
     },
   }),
 );
